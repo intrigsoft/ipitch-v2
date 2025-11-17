@@ -61,3 +61,10 @@ ai:
 vector-db:
   embedding-dimension: 3072  # text-embedding-3-large dimension
   similarity-function: cosine  # Options: cosine, l2, inner_product
+
+# Elasticsearch configuration for analysis results indexing
+spring:
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+    connection-timeout: 5s
+    socket-timeout: 60s

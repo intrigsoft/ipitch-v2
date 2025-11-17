@@ -22,7 +22,8 @@ class CommentAnalysisService(
     private val aiServiceFactory: AIServiceFactory,
     private val commentAnalysisRepository: CommentAnalysisRepository,
     private val aiProperties: AIProperties,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val elasticsearchSyncService: AnalysisElasticsearchSyncService? = null
 ) {
 
     private val logger = KotlinLogging.logger {}
@@ -60,7 +61,7 @@ class CommentAnalysisService(
                 provider = provider
             )
 
-            saveAnalysisResult(result)
+            saveAnalysisResult(result, comment, proposal)
             return@withContext result
         }
 
@@ -85,7 +86,7 @@ class CommentAnalysisService(
             provider = provider
         )
 
-        saveAnalysisResult(result)
+        saveAnalysisResult(result, comment, proposal)
         logger.info { "Successfully analyzed comment: ${comment.id}" }
 
         result
@@ -284,7 +285,7 @@ class CommentAnalysisService(
     /**
      * Save analysis result to database
      */
-    private fun saveAnalysisResult(result: CommentAnalysisResult) {
+    private fun saveAnalysisResult(result: CommentAnalysisResult, comment: Comment, proposal: Proposal) {
         val entity = CommentAnalysis(
             commentId = result.commentId,
             governanceFlags = result.governanceFlags,
@@ -303,7 +304,15 @@ class CommentAnalysisService(
             updatedAt = Instant.now()
         )
 
-        commentAnalysisRepository.save(entity)
+        val savedEntity = commentAnalysisRepository.save(entity)
+
+        // Sync to Elasticsearch for search and analytics
+        try {
+            elasticsearchSyncService?.syncCommentAnalysis(savedEntity, comment, proposal.id)
+                ?: logger.warn { "ElasticsearchSyncService not available, skipping ES sync" }
+        } catch (e: Exception) {
+            logger.error(e) { "Failed to sync comment analysis to Elasticsearch, but analysis saved to database" }
+        }
     }
 
     /**

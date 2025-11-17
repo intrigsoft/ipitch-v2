@@ -22,7 +22,8 @@ class ProposalAnalysisService(
     private val vectorDatabaseService: VectorDatabaseService,
     private val proposalAnalysisRepository: ProposalAnalysisRepository,
     private val aiProperties: AIProperties,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val elasticsearchSyncService: AnalysisElasticsearchSyncService? = null
 ) {
 
     private val logger = KotlinLogging.logger {}
@@ -84,7 +85,15 @@ class ProposalAnalysisService(
         )
 
         // Save to database
-        saveAnalysisResult(result)
+        val savedEntity = saveAnalysisResult(result)
+
+        // Sync to Elasticsearch for search and analytics
+        try {
+            elasticsearchSyncService?.syncProposalAnalysis(savedEntity, proposal)
+                ?: logger.warn { "ElasticsearchSyncService not available, skipping ES sync" }
+        } catch (e: Exception) {
+            logger.error(e) { "Failed to sync proposal analysis to Elasticsearch, but analysis saved to database" }
+        }
 
         logger.info { "Successfully analyzed proposal: ${proposal.id}" }
         result
@@ -186,7 +195,7 @@ class ProposalAnalysisService(
     /**
      * Save analysis result to database
      */
-    private fun saveAnalysisResult(result: ProposalAnalysisResult) {
+    private fun saveAnalysisResult(result: ProposalAnalysisResult): ProposalAnalysis {
         val entity = ProposalAnalysis(
             proposalId = result.proposalId,
             summary = result.summary,
@@ -200,7 +209,7 @@ class ProposalAnalysisService(
             updatedAt = Instant.now()
         )
 
-        proposalAnalysisRepository.save(entity)
+        return proposalAnalysisRepository.save(entity)
     }
 
     /**

@@ -5,6 +5,8 @@ This module provides AI-powered features for the iPitch platform, including:
 - **Proposal Analysis**: Automatic summarization, clarity scoring, and sector-specific scoring
 - **Comment Moderation**: Content governance, relevance analysis, and marketing detection
 - **Vector Search (RAG)**: Semantic search using PostgreSQL with pgvector
+- **Elasticsearch Integration**: Index analysis results for search and user behavior analytics
+- **User Analytics**: Comprehensive user profiling based on contribution quality and behavior
 - **Flexible AI Providers**: Support for OpenAI, Anthropic, and local models
 
 ## Features
@@ -25,6 +27,32 @@ When a comment is added, the system:
 3. **Scores sector relevance** for the comment content
 4. **Determines mode** (SUPPORTIVE, CRITICAL, NEUTRAL, INQUISITIVE, SUGGESTIVE)
 5. **Detects marketing** - identifies promotional content
+
+### Elasticsearch Integration
+All analysis results are automatically indexed in Elasticsearch for:
+1. **Search** - Full-text search across proposals and comments by analysis results
+2. **User Analytics** - Track user behavior, quality metrics, and contributions
+3. **Moderation** - Find flagged content, spam, and marketing across the platform
+4. **Sector Analysis** - Discover trends and expertise in specific sectors
+
+### User Analytics
+The system provides comprehensive user profiling based on AI analysis:
+1. **Proposal Quality Metrics**:
+   - Average clarity score
+   - High-quality proposal count
+   - Sector expertise mapping
+
+2. **Comment Behavior Metrics**:
+   - Flagged comment ratio
+   - Average relevance score
+   - Mode distribution (aggressiveness indicator)
+   - Marketing/spam detection
+   - Sector contribution patterns
+
+3. **Calculated Scores**:
+   - **Quality Score** (0-10): Overall contribution quality
+   - **Aggressiveness Score** (0-10): How critical vs supportive (0=very supportive, 10=very critical)
+   - **Lenience Score** (0-10): How lenient vs strict in evaluating others (0=very critical, 10=very lenient)
 
 ## Configuration
 
@@ -191,6 +219,62 @@ if (analysis?.isFlagged == true) {
     println("Relevance: ${analysis?.relevanceScore}/10")
     println("Mode: ${analysis?.mode}")
 }
+```
+
+### Get User Analytics Profile
+```kotlin
+val profile = userAnalyticsService.getUserProfile(userId)
+
+// Proposal quality metrics
+println("Proposals: ${profile.proposalMetrics.totalProposals}")
+println("Avg Clarity: ${profile.proposalMetrics.averageClarityScore}/10")
+println("High Quality: ${profile.proposalMetrics.highQualityProposalCount}")
+println("Sector Expertise: ${profile.proposalMetrics.sectorExpertise}")
+
+// Comment behavior metrics
+println("Comments: ${profile.commentMetrics.totalComments}")
+println("Flagged: ${profile.commentMetrics.flaggedCommentPercentage}%")
+println("Avg Relevance: ${profile.commentMetrics.averageRelevanceScore}/10")
+println("Mode Distribution: ${profile.commentMetrics.modeDistribution}")
+
+// Calculated scores
+println("Quality Score: ${profile.qualityScore}/10")
+println("Aggressiveness: ${profile.aggressivenessScore}/10")
+println("Lenience: ${profile.lenienceScore}/10")
+```
+
+### Search Analysis Results in Elasticsearch
+```kotlin
+// Search proposals by summary content
+val proposals = proposalAnalysisRepository.searchBySummary(
+    "healthcare innovation",
+    PageRequest.of(0, 10)
+)
+
+// Find high-clarity proposals
+val highQuality = proposalAnalysisRepository.findByClarityScoreBetween(
+    8.0, 10.0,
+    PageRequest.of(0, 10)
+)
+
+// Find flagged comments for moderation
+val flaggedComments = commentAnalysisRepository.findByIsFlagged(
+    true,
+    PageRequest.of(0, 20)
+)
+
+// Find critical comments on a proposal
+val criticalComments = commentAnalysisRepository.findByProposalIdAndMode(
+    proposalId.toString(),
+    "CRITICAL",
+    PageRequest.of(0, 10)
+)
+
+// Get top quality authors
+val topAuthors = userAnalyticsService.getTopQualityProposalAuthors(limit = 10)
+
+// Find users with most flagged content (for moderation)
+val problematicUsers = userAnalyticsService.getUsersWithMostFlaggedComments(limit = 10)
 ```
 
 ## Testing
