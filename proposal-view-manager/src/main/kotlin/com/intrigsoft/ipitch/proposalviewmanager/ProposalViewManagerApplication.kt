@@ -1,4 +1,4 @@
-package com.example.ipitch.proposalviewmanager
+package com.intrigsoft.ipitch.proposalviewmanager
 
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication

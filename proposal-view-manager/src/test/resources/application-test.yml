@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: proposal-view-manager-test
+
+server:
+  port: 0
+
+logging:
+  level:
+    com.intrigsoft.ipitch: INFO
