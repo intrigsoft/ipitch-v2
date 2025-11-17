@@ -6,7 +6,7 @@ plugins {
 }
 
 allprojects {
-    group = "com.example.ipitch"
+    group = "com.intrigsoft.ipitch"
     version = "0.0.1-SNAPSHOT"
 
     repositories {
