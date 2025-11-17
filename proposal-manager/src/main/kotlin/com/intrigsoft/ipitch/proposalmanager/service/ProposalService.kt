@@ -19,7 +19,8 @@ class ProposalService(
     private val proposalRepository: ProposalRepository,
     private val contributorRepository: ContributorRepository,
     private val userRepository: UserRepository,
-    private val gitService: GitService
+    private val gitService: GitService,
+    private val proposalViewManagerClient: com.intrigsoft.ipitch.proposalmanager.client.ProposalViewManagerClient
 ) {
 
     /**
@@ -343,6 +344,38 @@ class ProposalService(
         proposal.gitCommitHash = commitHash
         proposal.updatedAt = LocalDateTime.now()
         val publishedProposal = proposalRepository.save(proposal)
+
+        // Publish to view manager for indexing
+        try {
+            val publishDto = com.intrigsoft.ipitch.proposalmanager.client.ProposalPublishDto(
+                id = publishedProposal.id!!,
+                title = publishedProposal.title,
+                content = publishedProposal.content,
+                ownerId = publishedProposal.ownerId,
+                ownerName = "User-${publishedProposal.ownerId}",
+                contributors = publishedProposal.contributors.map { contributor ->
+                    com.intrigsoft.ipitch.proposalmanager.client.ContributorDto(
+                        id = contributor.id!!,
+                        userId = contributor.userId,
+                        userName = "User-${contributor.userId}",
+                        role = contributor.role,
+                        status = contributor.status.name
+                    )
+                },
+                version = publishedProposal.version,
+                status = publishedProposal.status.name,
+                stats = publishedProposal.stats,
+                workingBranch = publishedProposal.workingBranch,
+                gitCommitHash = publishedProposal.gitCommitHash,
+                createdAt = publishedProposal.createdAt,
+                updatedAt = publishedProposal.updatedAt
+            )
+            proposalViewManagerClient.publishProposal(publishDto)
+            logger.info { "Proposal $proposalId published to view manager" }
+        } catch (e: Exception) {
+            logger.error(e) { "Error publishing proposal to view manager, but proposal was saved to database" }
+            // Don't fail the operation if view manager is down
+        }
 
         return toProposalResponse(publishedProposal)
     }
