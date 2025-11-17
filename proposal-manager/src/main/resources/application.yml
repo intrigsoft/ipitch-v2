@@ -3,9 +3,9 @@ spring:
     name: proposal-manager
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/ipitch_proposals
-    username: postgres
-    password: postgres
+    url: jdbc:postgresql://localhost:5432/ipitch
+    username: ipitch
+    password: ipitch123
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -37,8 +37,21 @@ proposal:
     repository-path: ${PROPOSAL_GIT_REPO:/tmp/proposal-git-repo}
     main-branch: main
 
+# Proposal View Manager Client Configuration
+proposal-view-manager:
+  url: ${PROPOSAL_VIEW_MANAGER_URL:http://localhost:8082}
+
+# Feign Client Configuration
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 5000
+        readTimeout: 5000
+        loggerLevel: basic
+
 logging:
   level:
-    com.example.ipitch: DEBUG
+    com.intrigsoft.ipitch: DEBUG
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE

@@ -19,7 +19,8 @@ class ProposalService(
     private val proposalRepository: ProposalRepository,
     private val contributorRepository: ContributorRepository,
     private val userRepository: UserRepository,
-    private val gitService: GitService
+    private val gitService: GitService,
+    private val proposalViewManagerClient: com.intrigsoft.ipitch.proposalmanager.client.ProposalViewManagerClient
 ) {
 
     /**
@@ -344,7 +345,128 @@ class ProposalService(
         proposal.updatedAt = LocalDateTime.now()
         val publishedProposal = proposalRepository.save(proposal)
 
+        // Publish to view manager for indexing
+        try {
+            val publishDto = com.intrigsoft.ipitch.proposalmanager.client.ProposalPublishDto(
+                id = publishedProposal.id!!,
+                title = publishedProposal.title,
+                content = publishedProposal.content,
+                ownerId = publishedProposal.ownerId,
+                ownerName = "User-${publishedProposal.ownerId}",
+                contributors = publishedProposal.contributors.map { contributor ->
+                    com.intrigsoft.ipitch.proposalmanager.client.ContributorDto(
+                        id = contributor.id!!,
+                        userId = contributor.userId,
+                        userName = "User-${contributor.userId}",
+                        role = contributor.role,
+                        status = contributor.status.name
+                    )
+                },
+                version = publishedProposal.version,
+                status = publishedProposal.status.name,
+                stats = publishedProposal.stats,
+                workingBranch = publishedProposal.workingBranch,
+                gitCommitHash = publishedProposal.gitCommitHash,
+                createdAt = publishedProposal.createdAt,
+                updatedAt = publishedProposal.updatedAt
+            )
+            proposalViewManagerClient.publishProposal(publishDto)
+            logger.info { "Proposal $proposalId published to view manager" }
+        } catch (e: Exception) {
+            logger.error(e) { "Error publishing proposal to view manager, but proposal was saved to database" }
+            // Don't fail the operation if view manager is down
+        }
+
         return toProposalResponse(publishedProposal)
+    }
+
+    /**
+     * 10. Revert proposal to previous version
+     */
+    fun revertProposal(proposalId: UUID, ownerId: UUID): ProposalResponse {
+        logger.info { "Reverting proposal $proposalId" }
+
+        val proposal = proposalRepository.findById(proposalId)
+            .orElseThrow { ProposalNotFoundException("Proposal not found: $proposalId") }
+
+        // Verify owner
+        if (proposal.ownerId != ownerId) {
+            throw UnauthorizedOperationException("Only the proposal owner can revert proposals")
+        }
+
+        if (proposal.status != ProposalStatus.PUBLISHED) {
+            throw InvalidOperationException("Only published proposals can be reverted")
+        }
+
+        // Revert in Git
+        val revertResult = gitService.revertProposal(proposalId, proposal.version)
+
+        if (!revertResult.success) {
+            throw InvalidOperationException(revertResult.message)
+        }
+
+        // If this is the first version, just mark as DRAFT
+        if (revertResult.previousVersion == null || revertResult.proposalData == null) {
+            logger.info { "Proposal $proposalId is at initial version, marking as DRAFT" }
+            proposal.status = ProposalStatus.DRAFT
+            proposal.updatedAt = LocalDateTime.now()
+            val updatedProposal = proposalRepository.save(proposal)
+
+            // Remove from view manager index
+            try {
+                proposalViewManagerClient.deleteProposal(proposalId.toString())
+                logger.info { "Removed proposal $proposalId from view manager index" }
+            } catch (e: Exception) {
+                logger.error(e) { "Error removing proposal from view manager, but proposal was reverted in database" }
+            }
+
+            return toProposalResponse(updatedProposal)
+        }
+
+        // Update proposal with previous version data
+        val previousData = revertResult.proposalData
+        proposal.title = previousData.title
+        proposal.content = previousData.content
+        proposal.version = previousData.version
+        proposal.gitCommitHash = previousData.commitHash
+        proposal.status = ProposalStatus.PUBLISHED
+        proposal.updatedAt = LocalDateTime.now()
+        val revertedProposal = proposalRepository.save(proposal)
+
+        logger.info { "Proposal $proposalId reverted to version ${previousData.version}" }
+
+        // Publish previous version to view manager
+        try {
+            val publishDto = com.intrigsoft.ipitch.proposalmanager.client.ProposalPublishDto(
+                id = revertedProposal.id!!,
+                title = revertedProposal.title,
+                content = revertedProposal.content,
+                ownerId = revertedProposal.ownerId,
+                ownerName = "User-${revertedProposal.ownerId}",
+                contributors = revertedProposal.contributors.map { contributor ->
+                    com.intrigsoft.ipitch.proposalmanager.client.ContributorDto(
+                        id = contributor.id!!,
+                        userId = contributor.userId,
+                        userName = "User-${contributor.userId}",
+                        role = contributor.role,
+                        status = contributor.status.name
+                    )
+                },
+                version = revertedProposal.version,
+                status = revertedProposal.status.name,
+                stats = revertedProposal.stats,
+                workingBranch = revertedProposal.workingBranch,
+                gitCommitHash = revertedProposal.gitCommitHash,
+                createdAt = revertedProposal.createdAt,
+                updatedAt = revertedProposal.updatedAt
+            )
+            proposalViewManagerClient.publishProposal(publishDto)
+            logger.info { "Published reverted proposal $proposalId (version ${previousData.version}) to view manager" }
+        } catch (e: Exception) {
+            logger.error(e) { "Error publishing reverted proposal to view manager, but proposal was reverted in database" }
+        }
+
+        return toProposalResponse(revertedProposal)
     }
 
     /**

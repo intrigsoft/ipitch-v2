@@ -24,6 +24,9 @@ dependencies {
     // JGit for Git operations
     implementation("org.eclipse.jgit:org.eclipse.jgit:6.7.0.202309050840-r")
 
+    // Spring Cloud OpenFeign
+    implementation("org.springframework.cloud:spring-cloud-starter-openfeign:4.1.0")
+
     // Swagger/OpenAPI
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.2.0")
 

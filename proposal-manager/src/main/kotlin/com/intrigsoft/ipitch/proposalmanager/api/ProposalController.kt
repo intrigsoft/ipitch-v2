@@ -226,6 +226,30 @@ class ProposalController(
         )
     }
 
+    @PostMapping("/{proposalId}/revert")
+    @Operation(
+        summary = "Revert a proposal to previous version",
+        description = "Reverts a published proposal to its previous version. If it's the first version, marks it as DRAFT and removes from search index. Otherwise, reverts to the previous version and updates the search index."
+    )
+    fun revertProposal(
+        @Parameter(description = "Proposal ID") @PathVariable proposalId: UUID,
+        @Parameter(description = "Owner User ID") @RequestParam ownerId: UUID
+    ): ResponseEntity<ApiResponse<ProposalResponse>> {
+        logger.info { "API: Reverting proposal $proposalId by owner $ownerId" }
+
+        val proposal = proposalService.revertProposal(proposalId, ownerId)
+
+        logger.info { "API: Proposal reverted successfully to version ${proposal.version}" }
+
+        return ResponseEntity.ok(
+            ApiResponse(
+                success = true,
+                message = "Proposal reverted successfully to version ${proposal.version}",
+                data = proposal
+            )
+        )
+    }
+
     @GetMapping("/{proposalId}")
     @Operation(
         summary = "Get a proposal",
