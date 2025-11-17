@@ -2,6 +2,11 @@ spring:
   application:
     name: proposal-view-manager-test
 
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchDataAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchRepositoriesAutoConfiguration
+
 server:
   port: 0
 
