@@ -8,6 +8,7 @@ plugins {
 
 dependencies {
     implementation(project(":common"))
+    implementation(project(":ai-integration"))
 
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")

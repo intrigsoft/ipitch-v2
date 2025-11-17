@@ -5,6 +5,8 @@ import com.intrigsoft.ipitch.repository.*
 import com.intrigsoft.ipitch.proposalmanager.dto.request.*
 import com.intrigsoft.ipitch.proposalmanager.dto.response.*
 import com.intrigsoft.ipitch.proposalmanager.exception.*
+import com.intrigsoft.ipitch.aiintegration.service.ProposalAnalysisService
+import kotlinx.coroutines.runBlocking
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -20,7 +22,8 @@ class ProposalService(
     private val contributorRepository: ContributorRepository,
     private val userRepository: UserRepository,
     private val gitService: GitService,
-    private val proposalViewManagerClient: com.intrigsoft.ipitch.proposalmanager.client.ProposalViewManagerClient
+    private val proposalViewManagerClient: com.intrigsoft.ipitch.proposalmanager.client.ProposalViewManagerClient,
+    private val proposalAnalysisService: ProposalAnalysisService? = null
 ) {
 
     /**
@@ -344,6 +347,21 @@ class ProposalService(
         proposal.gitCommitHash = commitHash
         proposal.updatedAt = LocalDateTime.now()
         val publishedProposal = proposalRepository.save(proposal)
+
+        // AI Analysis: Analyze proposal, generate summary, sector scores, clarity score, and index in vector DB
+        try {
+            proposalAnalysisService?.let {
+                runBlocking {
+                    logger.info { "Starting AI analysis for proposal $proposalId" }
+                    val analysisResult = it.analyzeProposal(publishedProposal)
+                    logger.info { "AI analysis completed for proposal $proposalId. Summary: ${analysisResult.summary.take(100)}..." }
+                    logger.info { "Clarity score: ${analysisResult.clarityScore}, Sector scores: ${analysisResult.sectorScores}" }
+                }
+            } ?: logger.warn { "ProposalAnalysisService not available, skipping AI analysis" }
+        } catch (e: Exception) {
+            logger.error(e) { "Error during AI analysis for proposal $proposalId, but proposal was published successfully" }
+            // Don't fail the publication if AI analysis fails
+        }
 
         // Publish to view manager for indexing
         try {
