@@ -19,9 +19,11 @@ class ProposalIndexService(
 
     /**
      * Index or update a proposal in Elasticsearch
+     * Note: Using proposal UUID as document ID ensures only one version exists.
+     * When a new version is published, it replaces the previous version in the index.
      */
     fun indexProposal(publishDto: ProposalPublishDto) {
-        logger.info { "Indexing proposal: ${publishDto.id}" }
+        logger.info { "Indexing proposal: ${publishDto.id}, version: ${publishDto.version}" }
 
         try {
             val proposalDocument = ProposalDocument(

@@ -103,12 +103,28 @@ Get all proposals with pagination.
 
 ## Integration Flow
 
+### Publishing a Proposal
+
 When a proposal is published in Proposal Manager:
 
 1. Proposal Manager updates the proposal status to PUBLISHED in PostgreSQL
 2. Proposal Manager calls View Manager's internal API via Feign Client
-3. View Manager indexes the proposal in Elasticsearch
+3. View Manager indexes the proposal in Elasticsearch (replaces any existing version)
 4. Frontend can now search and view the proposal via public API
+
+**Note**: Only one version of each proposal exists in Elasticsearch at any time. When a new version is published, it replaces the previous version in the index using the same document ID (proposal UUID).
+
+### Reverting a Proposal
+
+When a proposal is reverted to a previous version:
+
+1. Owner initiates revert via `POST /api/proposals/{proposalId}/revert`
+2. Proposal Manager reverts Git repository to previous version tag
+3. Database is updated with previous version data
+4. Two scenarios:
+   - **First version revert**: Proposal is marked as DRAFT and removed from Elasticsearch
+   - **Other versions**: Previous version is re-indexed in Elasticsearch, replacing the current version
+5. Current version tag is deleted from Git repository
 
 ## Running the Services
 
@@ -255,3 +271,66 @@ The Proposal Manager is designed to be resilient:
 - Add search analytics and metrics
 - Support for proposal versioning in search results
 - Faceted search capabilities
+
+## Proposal Manager API
+
+### Revert Endpoint
+
+#### POST `/api/proposals/{proposalId}/revert`
+
+Reverts a published proposal to its previous version.
+
+**Query Parameters:**
+- `ownerId` - UUID of the proposal owner (required for authorization)
+
+**Behavior:**
+- **First version (0.0.1)**: 
+  - Proposal status changed to DRAFT
+  - Removed from Elasticsearch index
+  - Git repository reverted to pre-publish state
+  
+- **Subsequent versions (e.g., 0.0.2 → 0.0.1)**:
+  - Proposal data reverted to previous version
+  - Previous version re-indexed in Elasticsearch
+  - Current version tag deleted from Git
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Proposal reverted successfully to version 0.0.1",
+  "data": {
+    "id": "uuid",
+    "title": "Previous Title",
+    "content": "Previous Content",
+    "version": "0.0.1",
+    "status": "PUBLISHED",
+    ...
+  }
+}
+```
+
+**Error Cases:**
+- Not the owner: 403 Unauthorized
+- Proposal not PUBLISHED: 400 Bad Request
+- Git revert fails: 500 Internal Server Error
+
+## Version Management
+
+### How Versioning Works
+
+1. **Version Format**: Semantic versioning (major.minor.patch)
+2. **Initial Version**: 0.0.0 (incremented to 0.0.1 on first publish)
+3. **Increment Strategy**: Patch version incremented on each publish
+4. **Git Tags**: Each published version creates a tag: `{proposalId}-{version}`
+
+### Elasticsearch Version Guarantee
+
+The implementation ensures only one version of each proposal exists in Elasticsearch:
+
+- **Document ID**: Proposal UUID (consistent across versions)
+- **Indexing Strategy**: Elasticsearch `save()` operation with same ID updates existing document
+- **Revert Behavior**: Previous version replaces current in index
+- **Delete on First Revert**: Unpublished proposals removed from index
+
+This design prevents version proliferation in search results while maintaining full Git history.

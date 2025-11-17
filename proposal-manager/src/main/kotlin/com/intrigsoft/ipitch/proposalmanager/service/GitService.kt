@@ -354,6 +354,123 @@ class GitService(
     }
 
     /**
+     * Reverts a proposal to a previous version
+     * Returns the proposal data from the previous version, or null if this is the first version
+     */
+    fun revertProposal(proposalId: UUID, currentVersion: String): RevertResult {
+        logger.info { "Reverting proposal $proposalId from version $currentVersion" }
+
+        try {
+            // Parse version to determine previous version
+            val previousVersion = decrementVersion(currentVersion)
+
+            if (previousVersion == null) {
+                logger.info { "Proposal $proposalId is at initial version, cannot revert further" }
+                return RevertResult(
+                    success = true,
+                    message = "This is the first version, no previous version to revert to",
+                    previousVersion = null,
+                    proposalData = null
+                )
+            }
+
+            val previousTagName = "$proposalId-$previousVersion"
+            val workingBranch = "proposal/$proposalId"
+
+            // Check if previous tag exists
+            val tags = git.tagList().call()
+            val tagExists = tags.any { it.name == "refs/tags/$previousTagName" }
+
+            if (!tagExists) {
+                logger.warn { "Previous version tag not found: $previousTagName" }
+                return RevertResult(
+                    success = false,
+                    message = "Previous version tag not found: $previousTagName",
+                    previousVersion = null,
+                    proposalData = null
+                )
+            }
+
+            // Get the commit hash of the previous version tag
+            val tagRef = git.repository.resolve("refs/tags/$previousTagName")
+            val taggedCommit = git.repository.parseCommit(tagRef)
+
+            logger.info { "Found previous version tag: $previousTagName at commit ${taggedCommit.name}" }
+
+            // Checkout working branch
+            checkoutBranch(workingBranch)
+
+            // Reset working branch to previous version
+            git.reset()
+                .setMode(org.eclipse.jgit.api.ResetCommand.ResetType.HARD)
+                .setRef(taggedCommit.name)
+                .call()
+
+            logger.info { "Reset working branch to previous version: ${taggedCommit.name}" }
+
+            // Also update main branch to previous version
+            checkoutBranch(gitProperties.mainBranch)
+            git.reset()
+                .setMode(org.eclipse.jgit.api.ResetCommand.ResetType.HARD)
+                .setRef(taggedCommit.name)
+                .call()
+
+            // Delete the current version tag (we're reverting it)
+            val currentTagName = "$proposalId-$currentVersion"
+            try {
+                git.tagDelete().setTags(currentTagName).call()
+                logger.info { "Deleted current version tag: $currentTagName" }
+            } catch (e: Exception) {
+                logger.warn(e) { "Could not delete current version tag: $currentTagName" }
+            }
+
+            // Read proposal data from the previous version
+            val proposalDir = File(repoPath.toFile(), proposalId.toString())
+            val contentFile = File(proposalDir, "content.md")
+            val metadataFile = File(proposalDir, "metadata.json")
+
+            val content = if (contentFile.exists()) contentFile.readText() else ""
+            val metadata = if (metadataFile.exists()) metadataFile.readText() else "{}"
+            val title = extractJsonValue(metadata, "title")
+
+            logger.info { "Successfully reverted proposal $proposalId to version $previousVersion" }
+
+            return RevertResult(
+                success = true,
+                message = "Successfully reverted to version $previousVersion",
+                previousVersion = previousVersion,
+                proposalData = ProposalVersionData(
+                    title = title,
+                    content = content,
+                    version = previousVersion,
+                    commitHash = taggedCommit.name
+                )
+            )
+        } catch (e: Exception) {
+            logger.error(e) { "Error reverting proposal $proposalId" }
+            throw RuntimeException("Failed to revert proposal", e)
+        }
+    }
+
+    /**
+     * Decrements a semantic version string
+     * Returns null if the version is 0.0.0 (initial version)
+     */
+    private fun decrementVersion(version: String): String? {
+        val parts = version.split(".")
+        val major = parts.getOrNull(0)?.toIntOrNull() ?: 0
+        val minor = parts.getOrNull(1)?.toIntOrNull() ?: 0
+        val patch = parts.getOrNull(2)?.toIntOrNull() ?: 0
+
+        return when {
+            patch > 0 -> "$major.$minor.${patch - 1}"
+            minor > 0 -> "$major.${minor - 1}.0"
+            major > 0 -> "${major - 1}.0.0"
+            else -> null // Can't decrement 0.0.0
+        }
+    }
+
+    /**
      * Checks out a branch
      */
     private fun checkoutBranch(branchName: String) {
