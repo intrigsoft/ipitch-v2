@@ -1,6 +1,6 @@
 spring:
   application:
-    name: proposal-manager
+    name: user-manager
 
   datasource:
     url: jdbc:postgresql://localhost:5432/ipitch
@@ -28,7 +28,7 @@ spring:
           jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8080/realms/ipitch/protocol/openid-connect/certs}
 
 server:
-  port: 8081
+  port: 8084
 
 # Swagger/OpenAPI Configuration
 springdoc:
@@ -38,27 +38,18 @@ springdoc:
     path: /swagger-ui.html
     enabled: true
 
-# Custom application properties
-proposal:
-  git:
-    repository-path: ${PROPOSAL_GIT_REPO:/tmp/proposal-git-repo}
-    main-branch: main
-
-# Proposal View Manager Client Configuration
-proposal-view-manager:
-  url: ${PROPOSAL_VIEW_MANAGER_URL:http://localhost:8082}
-
-# Feign Client Configuration
-feign:
-  client:
-    config:
-      default:
-        connectTimeout: 5000
-        readTimeout: 5000
-        loggerLevel: basic
+# Keycloak Configuration
+keycloak:
+  auth-server-url: ${KEYCLOAK_URL:http://localhost:8080}
+  realm: ${KEYCLOAK_REALM:ipitch}
+  resource: ${KEYCLOAK_CLIENT_ID:ipitch-client}
+  admin:
+    username: ${KEYCLOAK_ADMIN_USER:admin}
+    password: ${KEYCLOAK_ADMIN_PASSWORD:admin123}
 
 logging:
   level:
     com.intrigsoft.ipitch: DEBUG
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.springframework.security: DEBUG
