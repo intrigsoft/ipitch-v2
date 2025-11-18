@@ -62,8 +62,26 @@ vector-db:
   embedding-dimension: 3072  # text-embedding-3-large dimension
   similarity-function: cosine  # Options: cosine, l2, inner_product
 
-# Elasticsearch configuration for analysis results indexing
+# Spring configuration
 spring:
+  # PostgreSQL datasource configuration for vector database
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/ipitch}
+    username: ${DATABASE_USER:ipitch}
+    password: ${DATABASE_PASSWORD:ipitch123}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          lob:
+            non_contextual_creation: true
+
+  # Elasticsearch configuration for analysis results indexing
   elasticsearch:
     uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
     connection-timeout: 5s

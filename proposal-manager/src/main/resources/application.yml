@@ -55,3 +55,65 @@ logging:
     com.intrigsoft.ipitch: DEBUG
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+# AI Integration Configuration
+ai:
+  provider: openai  # Options: openai, anthropic, local
+
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+    model: gpt-4-turbo-preview
+    embedding-model: text-embedding-3-large
+    base-url: https://api.openai.com/v1
+    timeout: 60000
+    max-retries: 3
+
+  anthropic:
+    api-key: ${ANTHROPIC_API_KEY:}
+    model: claude-3-5-sonnet-20241022
+    base-url: https://api.anthropic.com/v1
+    timeout: 60000
+    max-retries: 3
+
+  local:
+    base-url: ${LOCAL_AI_URL:http://localhost:11434}
+    model: llama2
+    embedding-model: nomic-embed-text
+    timeout: 120000
+
+  rag:
+    top-k: 5
+    similarity-threshold: 0.7
+    chunk-size: 1000
+    chunk-overlap: 200
+
+  sectors:
+    enabled:
+      - IT
+      - Legal
+      - Media
+      - Environment
+      - Healthcare
+      - Education
+      - Transport
+      - Tourism
+      - Finance
+      - Agriculture
+      - Energy
+      - Manufacturing
+
+  moderation:
+    enabled: true
+    auto-flag-threshold: 0.8
+    categories:
+      - hate
+      - harassment
+      - self-harm
+      - sexual
+      - violence
+      - profanity
+      - spam
+
+vector-db:
+  embedding-dimension: 3072
+  similarity-function: cosine
