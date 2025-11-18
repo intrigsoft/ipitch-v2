@@ -489,7 +489,102 @@ class GitService(
         return matchResult?.groupValues?.get(1) ?: throw IllegalArgumentException("Key not found: $key")
     }
 
+    /**
+     * Gets all commits by a specific user (by git email or git username)
+     * Returns a list of commit information including hash, message, timestamp, and proposal ID
+     */
+    fun getUserCommits(gitEmail: String?, gitUsername: String?): List<UserCommitInfo> {
+        logger.info { "Fetching commits for user with email: $gitEmail, username: $gitUsername" }
+
+        if (gitEmail == null && gitUsername == null) {
+            logger.warn { "No git email or username provided" }
+            return emptyList()
+        }
+
+        try {
+            // Get all commits from the repository
+            val commits = git.log().all().call()
+            val userCommits = mutableListOf<UserCommitInfo>()
+
+            for (commit in commits) {
+                val authorEmail = commit.authorIdent.emailAddress
+                val authorName = commit.authorIdent.name
+
+                // Check if this commit was made by the user
+                val isUserCommit = (gitEmail != null && authorEmail.equals(gitEmail, ignoreCase = true)) ||
+                                   (gitUsername != null && authorName.equals(gitUsername, ignoreCase = true))
+
+                if (isUserCommit) {
+                    // Extract proposal ID from commit message or changed files
+                    val proposalId = extractProposalIdFromCommit(commit)
+
+                    userCommits.add(
+                        UserCommitInfo(
+                            commitHash = commit.name,
+                            message = commit.fullMessage,
+                            authorName = authorName,
+                            authorEmail = authorEmail,
+                            timestamp = commit.authorIdent.`when`.toInstant(),
+                            proposalId = proposalId
+                        )
+                    )
+                }
+            }
+
+            logger.info { "Found ${userCommits.size} commits for user" }
+            return userCommits.sortedByDescending { it.timestamp }
+        } catch (e: Exception) {
+            logger.error(e) { "Error fetching user commits" }
+            return emptyList()
+        }
+    }
+
+    /**
+     * Extracts proposal ID from commit by analyzing changed files
+     */
+    private fun extractProposalIdFromCommit(commit: org.eclipse.jgit.revwalk.RevCommit): String? {
+        try {
+            val treeWalk = org.eclipse.jgit.treewalk.TreeWalk(git.repository)
+
+            if (commit.parentCount > 0) {
+                val parent = commit.getParent(0)
+                val parentTree = git.repository.parseCommit(parent).tree
+                val commitTree = commit.tree
+
+                treeWalk.addTree(parentTree)
+                treeWalk.addTree(commitTree)
+                treeWalk.isRecursive = true
+
+                while (treeWalk.next()) {
+                    val path = treeWalk.pathString
+                    // Check if path starts with a UUID pattern (proposal directory)
+                    val uuidPattern = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}".toRegex()
+                    val matchResult = uuidPattern.find(path)
+                    if (matchResult != null) {
+                        return matchResult.value
+                    }
+                }
+                treeWalk.close()
+            }
+        } catch (e: Exception) {
+            logger.debug(e) { "Could not extract proposal ID from commit ${commit.name}" }
+        }
+        return null
+    }
+
     fun close() {
         git.close()
     }
 }
+
+/**
+ * Data class representing commit information for a user
+ */
+data class UserCommitInfo(
+    val commitHash: String,
+    val message: String,
+    val authorName: String,
+    val authorEmail: String,
+    val timestamp: java.time.Instant,
+    val proposalId: String?
+)

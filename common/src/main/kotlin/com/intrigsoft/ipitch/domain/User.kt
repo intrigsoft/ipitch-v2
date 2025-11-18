@@ -28,6 +28,9 @@ data class User(
     @Column(columnDefinition = "jsonb", nullable = false)
     val scores: Map<String, Any> = emptyMap(), // Interests and maturity scores
 
+    @Column(nullable = false)
+    var dirty: Boolean = false, // Indicates if user scores need recalculation
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     val status: UserStatus = UserStatus.ACTIVE,

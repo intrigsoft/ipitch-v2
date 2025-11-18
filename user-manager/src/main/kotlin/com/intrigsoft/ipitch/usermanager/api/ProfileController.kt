@@ -20,17 +20,21 @@ private val logger = KotlinLogging.logger {}
 @Tag(name = "User Profile", description = "User profile management endpoints")
 @SecurityRequirement(name = "bearer-jwt")
 class ProfileController(
-    private val userService: UserService
+    private val userService: UserService,
+    private val userScoreService: com.intrigsoft.ipitch.usermanager.service.UserScoreService
 ) {
 
     @GetMapping("/me")
     @Operation(
         summary = "Get own profile",
-        description = "Returns the full profile of the authenticated user including all private information"
+        description = "Returns the full profile of the authenticated user including all private information. If the profile is dirty, scores will be recalculated before returning."
     )
     fun getOwnProfile(@AuthenticationPrincipal jwt: Jwt): ResponseEntity<ProfileResponse> {
         val userId = jwt.subject
         logger.info { "Getting profile for user: $userId" }
+
+        // Recalculate scores if user is dirty
+        userScoreService.recalculateScoresIfDirty(userId)
 
         val user = userService.getUserProfile(userId)
         return ResponseEntity.ok(ProfileResponse.fromUser(user, includePrivateInfo = true))
@@ -39,7 +43,7 @@ class ProfileController(
     @GetMapping("/{userId}")
     @Operation(
         summary = "Get user profile by ID",
-        description = "Returns the filtered profile of a user based on their privacy settings"
+        description = "Returns the filtered profile of a user based on their privacy settings. If the profile is dirty, scores will be recalculated before returning."
     )
     fun getUserProfile(
         @PathVariable userId: String,
@@ -47,6 +51,9 @@ class ProfileController(
     ): ResponseEntity<ProfileResponse> {
         val requestingUserId = jwt.subject
         logger.info { "User $requestingUserId getting profile for user: $userId" }
+
+        // Recalculate scores if user is dirty
+        userScoreService.recalculateScoresIfDirty(userId)
 
         val user = userService.getUserProfile(userId)
 
