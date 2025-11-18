@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN" monitorInterval="30">
+    <Properties>
+        <Property name="LOG_PATTERN">%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{correlationId}] [%thread] %-5level %logger{36} - %msg%n</Property>
+        <Property name="LOG_DIR">logs/proposal-manager</Property>
+    </Properties>
+
+    <Appenders>
+        <!-- Console Appender -->
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+        </Console>
+
+        <!-- All Logs (INFO level and above) -->
+        <RollingFile name="InfoFile" fileName="${LOG_DIR}/info.log"
+                     filePattern="${LOG_DIR}/info-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="100MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="30"/>
+            <Filters>
+                <ThresholdFilter level="INFO" onMatch="ACCEPT" onMismatch="DENY"/>
+            </Filters>
+        </RollingFile>
+
+        <!-- Debug Logs -->
+        <RollingFile name="DebugFile" fileName="${LOG_DIR}/debug.log"
+                     filePattern="${LOG_DIR}/debug-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="100MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="7"/>
+            <Filters>
+                <ThresholdFilter level="DEBUG" onMatch="ACCEPT" onMismatch="DENY"/>
+            </Filters>
+        </RollingFile>
+
+        <!-- Error Logs -->
+        <RollingFile name="ErrorFile" fileName="${LOG_DIR}/error.log"
+                     filePattern="${LOG_DIR}/error-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="50MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="30"/>
+            <Filters>
+                <ThresholdFilter level="ERROR" onMatch="ACCEPT" onMismatch="DENY"/>
+            </Filters>
+        </RollingFile>
+
+        <!-- AI Interaction Logs -->
+        <RollingFile name="AIFile" fileName="${LOG_DIR}/ai.log"
+                     filePattern="${LOG_DIR}/ai-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="100MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="30"/>
+        </RollingFile>
+
+        <!-- Proposal Change Logs -->
+        <RollingFile name="ProposalChangeFile" fileName="${LOG_DIR}/proposal-change.log"
+                     filePattern="${LOG_DIR}/proposal-change-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="100MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="30"/>
+        </RollingFile>
+
+        <!-- Async Appenders for better performance -->
+        <Async name="AsyncConsole">
+            <AppenderRef ref="Console"/>
+        </Async>
+
+        <Async name="AsyncInfo">
+            <AppenderRef ref="InfoFile"/>
+        </Async>
+
+        <Async name="AsyncDebug">
+            <AppenderRef ref="DebugFile"/>
+        </Async>
+
+        <Async name="AsyncError">
+            <AppenderRef ref="ErrorFile"/>
+        </Async>
+
+        <Async name="AsyncAI">
+            <AppenderRef ref="AIFile"/>
+        </Async>
+
+        <Async name="AsyncProposalChange">
+            <AppenderRef ref="ProposalChangeFile"/>
+        </Async>
+    </Appenders>
+
+    <Loggers>
+        <!-- Application Loggers -->
+        <Logger name="com.intrigsoft.ipitch.proposalmanager" level="DEBUG" additivity="false">
+            <AppenderRef ref="AsyncConsole"/>
+            <AppenderRef ref="AsyncInfo"/>
+            <AppenderRef ref="AsyncDebug"/>
+            <AppenderRef ref="AsyncError"/>
+        </Logger>
+
+        <!-- AI Integration Logs -->
+        <Logger name="com.intrigsoft.ipitch.aiintegration" level="DEBUG" additivity="false">
+            <AppenderRef ref="AsyncConsole"/>
+            <AppenderRef ref="AsyncAI"/>
+            <AppenderRef ref="AsyncError"/>
+        </Logger>
+
+        <!-- Proposal Change Logs -->
+        <Logger name="com.intrigsoft.ipitch.proposalmanager.service.ProposalService" level="DEBUG" additivity="false">
+            <AppenderRef ref="AsyncConsole"/>
+            <AppenderRef ref="AsyncProposalChange"/>
+            <AppenderRef ref="AsyncError"/>
+        </Logger>
+
+        <!-- Git Operations -->
+        <Logger name="com.intrigsoft.ipitch.proposalmanager.service.GitService" level="DEBUG" additivity="false">
+            <AppenderRef ref="AsyncConsole"/>
+            <AppenderRef ref="AsyncProposalChange"/>
+            <AppenderRef ref="AsyncError"/>
+        </Logger>
+
+        <!-- Feign Client Logs -->
+        <Logger name="com.intrigsoft.ipitch.proposalmanager.client" level="DEBUG" additivity="false">
+            <AppenderRef ref="AsyncConsole"/>
+            <AppenderRef ref="AsyncDebug"/>
+        </Logger>
+
+        <!-- Spring Framework -->
+        <Logger name="org.springframework" level="INFO" additivity="false">
+            <AppenderRef ref="AsyncConsole"/>
+            <AppenderRef ref="AsyncError"/>
+        </Logger>
+
+        <!-- Hibernate -->
+        <Logger name="org.hibernate.SQL" level="DEBUG" additivity="false">
+            <AppenderRef ref="AsyncDebug"/>
+        </Logger>
+
+        <Logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="TRACE" additivity="false">
+            <AppenderRef ref="AsyncDebug"/>
+        </Logger>
+
+        <!-- Root Logger -->
+        <Root level="INFO">
+            <AppenderRef ref="AsyncConsole"/>
+            <AppenderRef ref="AsyncInfo"/>
+            <AppenderRef ref="AsyncError"/>
+        </Root>
+    </Loggers>
+</Configuration>

@@ -9,10 +9,19 @@ dependencies {
     // Common module dependency
     api(project(":common"))
 
-    // Spring Boot
-    api("org.springframework.boot:spring-boot-starter:3.3.5")
-    implementation("org.springframework.boot:spring-boot-starter-data-jpa:3.3.5")
-    implementation("org.springframework.boot:spring-boot-starter-data-elasticsearch:3.3.5")
+    // Spring Boot - exclude default logging
+    api("org.springframework.boot:spring-boot-starter:3.3.5") {
+        exclude(group = "org.springframework.boot", module = "spring-boot-starter-logging")
+    }
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa:3.3.5") {
+        exclude(group = "org.springframework.boot", module = "spring-boot-starter-logging")
+    }
+    implementation("org.springframework.boot:spring-boot-starter-data-elasticsearch:3.3.5") {
+        exclude(group = "org.springframework.boot", module = "spring-boot-starter-logging")
+    }
+
+    // Log4j2 for logging
+    api("org.springframework.boot:spring-boot-starter-log4j2:3.3.5")
 
     // Kotlin
     api("org.jetbrains.kotlin:kotlin-reflect")

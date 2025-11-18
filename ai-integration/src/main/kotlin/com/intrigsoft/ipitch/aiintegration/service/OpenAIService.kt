@@ -32,6 +32,10 @@ class OpenAIService(
         temperature: Double,
         maxTokens: Int
     ): String = withContext(Dispatchers.IO) {
+        val startTime = System.currentTimeMillis()
+        logger.info { "[AI] Starting completion request - model: ${config.model}, temperature: $temperature, maxTokens: $maxTokens" }
+        logger.debug { "[AI] Prompt length: ${prompt.length} chars, SystemPrompt: ${systemPrompt?.length ?: 0} chars" }
+
         val messages = mutableListOf<Map<String, String>>()
 
         if (systemPrompt != null) {
@@ -53,21 +57,37 @@ class OpenAIService(
             .post(objectMapper.writeValueAsString(requestBody).toRequestBody(jsonMediaType))
             .build()
 
-        logger.debug { "Sending completion request to OpenAI" }
+        logger.debug { "[AI] Sending completion request to OpenAI API: ${config.baseUrl}/chat/completions" }
 
-        val response = httpClient.newCall(request).execute()
-        val responseBody = response.body?.string() ?: throw Exception("Empty response from OpenAI")
+        try {
+            val response = httpClient.newCall(request).execute()
+            val responseBody = response.body?.string() ?: throw Exception("Empty response from OpenAI")
+            val duration = System.currentTimeMillis() - startTime
 
-        if (!response.isSuccessful) {
-            logger.error { "OpenAI API error: ${response.code} - $responseBody" }
-            throw Exception("OpenAI API error: ${response.code} - $responseBody")
+            if (!response.isSuccessful) {
+                logger.error { "[AI] OpenAI API error: status=${response.code}, duration=${duration}ms, response=$responseBody" }
+                throw Exception("OpenAI API error: ${response.code} - $responseBody")
+            }
+
+            val jsonResponse = objectMapper.readTree(responseBody)
+            val content = jsonResponse["choices"][0]["message"]["content"].asText()
+            val usage = jsonResponse["usage"]
+
+            logger.info { "[AI] Completion successful - duration: ${duration}ms, response length: ${content.length} chars" }
+            logger.debug { "[AI] Token usage - prompt: ${usage?.get("prompt_tokens")}, completion: ${usage?.get("completion_tokens")}, total: ${usage?.get("total_tokens")}" }
+
+            content
+        } catch (e: Exception) {
+            val duration = System.currentTimeMillis() - startTime
+            logger.error(e) { "[AI] Completion request failed after ${duration}ms: ${e.message}" }
+            throw e
         }
-
-        val jsonResponse = objectMapper.readTree(responseBody)
-        jsonResponse["choices"][0]["message"]["content"].asText()
     }
 
     override suspend fun generateEmbedding(text: String): FloatArray = withContext(Dispatchers.IO) {
+        val startTime = System.currentTimeMillis()
+        logger.info { "[AI] Starting embedding request - model: ${config.embeddingModel}, text length: ${text.length} chars" }
+
         val requestBody = mapOf(
             "model" to config.embeddingModel,
             "input" to text,
@@ -81,20 +101,32 @@ class OpenAIService(
             .post(objectMapper.writeValueAsString(requestBody).toRequestBody(jsonMediaType))
             .build()
 
-        logger.debug { "Generating embedding with OpenAI" }
+        logger.debug { "[AI] Generating embedding with OpenAI API: ${config.baseUrl}/embeddings" }
 
-        val response = httpClient.newCall(request).execute()
-        val responseBody = response.body?.string() ?: throw Exception("Empty response from OpenAI")
+        try {
+            val response = httpClient.newCall(request).execute()
+            val responseBody = response.body?.string() ?: throw Exception("Empty response from OpenAI")
+            val duration = System.currentTimeMillis() - startTime
 
-        if (!response.isSuccessful) {
-            logger.error { "OpenAI API error: ${response.code} - $responseBody" }
-            throw Exception("OpenAI API error: ${response.code} - $responseBody")
+            if (!response.isSuccessful) {
+                logger.error { "[AI] OpenAI embedding error: status=${response.code}, duration=${duration}ms, response=$responseBody" }
+                throw Exception("OpenAI API error: ${response.code} - $responseBody")
+            }
+
+            val jsonResponse = objectMapper.readTree(responseBody)
+            val embeddingNode = jsonResponse["data"][0]["embedding"]
+            val usage = jsonResponse["usage"]
+            val embeddingArray = FloatArray(embeddingNode.size()) { i -> embeddingNode[i].floatValue() }
+
+            logger.info { "[AI] Embedding successful - duration: ${duration}ms, dimension: ${embeddingArray.size}" }
+            logger.debug { "[AI] Token usage - total: ${usage?.get("total_tokens")}" }
+
+            embeddingArray
+        } catch (e: Exception) {
+            val duration = System.currentTimeMillis() - startTime
+            logger.error(e) { "[AI] Embedding request failed after ${duration}ms: ${e.message}" }
+            throw e
         }
-
-        val jsonResponse = objectMapper.readTree(responseBody)
-        val embeddingNode = jsonResponse["data"][0]["embedding"]
-
-        FloatArray(embeddingNode.size()) { i -> embeddingNode[i].floatValue() }
     }
 
     override suspend fun generateStructuredResponse(
@@ -102,6 +134,10 @@ class OpenAIService(
         systemPrompt: String?,
         schema: String?
     ): String = withContext(Dispatchers.IO) {
+        val startTime = System.currentTimeMillis()
+        logger.info { "[AI] Starting structured response request - model: ${config.model}, schema provided: ${schema != null}" }
+        logger.debug { "[AI] Prompt length: ${prompt.length} chars, SystemPrompt: ${systemPrompt?.length ?: 0} chars" }
+
         val messages = mutableListOf<Map<String, String>>()
 
         val enhancedSystemPrompt = if (schema != null) {
@@ -127,21 +163,38 @@ class OpenAIService(
             .post(objectMapper.writeValueAsString(requestBody).toRequestBody(jsonMediaType))
             .build()
 
-        logger.debug { "Sending structured response request to OpenAI" }
+        logger.debug { "[AI] Sending structured response request to OpenAI API: ${config.baseUrl}/chat/completions" }
 
-        val response = httpClient.newCall(request).execute()
-        val responseBody = response.body?.string() ?: throw Exception("Empty response from OpenAI")
+        try {
+            val response = httpClient.newCall(request).execute()
+            val responseBody = response.body?.string() ?: throw Exception("Empty response from OpenAI")
+            val duration = System.currentTimeMillis() - startTime
 
-        if (!response.isSuccessful) {
-            logger.error { "OpenAI API error: ${response.code} - $responseBody" }
-            throw Exception("OpenAI API error: ${response.code} - $responseBody")
+            if (!response.isSuccessful) {
+                logger.error { "[AI] OpenAI structured response error: status=${response.code}, duration=${duration}ms, response=$responseBody" }
+                throw Exception("OpenAI API error: ${response.code} - $responseBody")
+            }
+
+            val jsonResponse = objectMapper.readTree(responseBody)
+            val content = jsonResponse["choices"][0]["message"]["content"].asText()
+            val usage = jsonResponse["usage"]
+
+            logger.info { "[AI] Structured response successful - duration: ${duration}ms, response length: ${content.length} chars" }
+            logger.debug { "[AI] Token usage - prompt: ${usage?.get("prompt_tokens")}, completion: ${usage?.get("completion_tokens")}, total: ${usage?.get("total_tokens")}" }
+
+            content
+        } catch (e: Exception) {
+            val duration = System.currentTimeMillis() - startTime
+            logger.error(e) { "[AI] Structured response request failed after ${duration}ms: ${e.message}" }
+            throw e
         }
-
-        val jsonResponse = objectMapper.readTree(responseBody)
-        jsonResponse["choices"][0]["message"]["content"].asText()
     }
 
     override suspend fun generateEmbeddings(texts: List<String>): List<FloatArray> = withContext(Dispatchers.IO) {
+        val startTime = System.currentTimeMillis()
+        logger.info { "[AI] Starting batch embedding request - model: ${config.embeddingModel}, count: ${texts.size} texts" }
+        logger.debug { "[AI] Total text length: ${texts.sumOf { it.length }} chars" }
+
         val requestBody = mapOf(
             "model" to config.embeddingModel,
             "input" to texts,
@@ -155,22 +208,35 @@ class OpenAIService(
             .post(objectMapper.writeValueAsString(requestBody).toRequestBody(jsonMediaType))
             .build()
 
-        logger.debug { "Generating ${texts.size} embeddings with OpenAI" }
+        logger.debug { "[AI] Generating ${texts.size} embeddings with OpenAI API: ${config.baseUrl}/embeddings" }
 
-        val response = httpClient.newCall(request).execute()
-        val responseBody = response.body?.string() ?: throw Exception("Empty response from OpenAI")
+        try {
+            val response = httpClient.newCall(request).execute()
+            val responseBody = response.body?.string() ?: throw Exception("Empty response from OpenAI")
+            val duration = System.currentTimeMillis() - startTime
 
-        if (!response.isSuccessful) {
-            logger.error { "OpenAI API error: ${response.code} - $responseBody" }
-            throw Exception("OpenAI API error: ${response.code} - $responseBody")
-        }
+            if (!response.isSuccessful) {
+                logger.error { "[AI] OpenAI batch embedding error: status=${response.code}, duration=${duration}ms, response=$responseBody" }
+                throw Exception("OpenAI API error: ${response.code} - $responseBody")
+            }
 
-        val jsonResponse = objectMapper.readTree(responseBody)
-        val dataArray = jsonResponse["data"]
+            val jsonResponse = objectMapper.readTree(responseBody)
+            val dataArray = jsonResponse["data"]
+            val usage = jsonResponse["usage"]
 
-        (0 until dataArray.size()).map { i ->
-            val embeddingNode = dataArray[i]["embedding"]
-            FloatArray(embeddingNode.size()) { j -> embeddingNode[j].floatValue() }
+            val embeddings = (0 until dataArray.size()).map { i ->
+                val embeddingNode = dataArray[i]["embedding"]
+                FloatArray(embeddingNode.size()) { j -> embeddingNode[j].floatValue() }
+            }
+
+            logger.info { "[AI] Batch embedding successful - duration: ${duration}ms, embeddings: ${embeddings.size}, dimension: ${embeddings.firstOrNull()?.size ?: 0}" }
+            logger.debug { "[AI] Token usage - total: ${usage?.get("total_tokens")}" }
+
+            embeddings
+        } catch (e: Exception) {
+            val duration = System.currentTimeMillis() - startTime
+            logger.error(e) { "[AI] Batch embedding request failed after ${duration}ms: ${e.message}" }
+            throw e
         }
     }
 
