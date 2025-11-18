@@ -22,6 +22,52 @@ services:
       timeout: 5s
       retries: 5
 
+  keycloak-postgres:
+    image: postgres:16-alpine
+    container_name: ipitch-keycloak-postgres
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak123
+    volumes:
+      - keycloak_postgres_data:/var/lib/postgresql/data
+    networks:
+      - ipitch-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: ipitch-keycloak
+    command: start-dev
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak123
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin123
+      KC_HEALTH_ENABLED: true
+      KC_METRICS_ENABLED: true
+      KC_HOSTNAME_STRICT: false
+      KC_HTTP_ENABLED: true
+    ports:
+      - "8080:8080"
+    depends_on:
+      keycloak-postgres:
+        condition: service_healthy
+    networks:
+      - ipitch-network
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080;echo -e \"GET /health/ready HTTP/1.1\nhost: 127.0.0.1:8080\n\" >&3;timeout --preserve-status 1 cat <&3 | grep -m 1 status | grep -m 1 UP"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
     container_name: ipitch-elasticsearch
@@ -44,6 +90,8 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  keycloak_postgres_data:
     driver: local
   elasticsearch_data:
     driver: local

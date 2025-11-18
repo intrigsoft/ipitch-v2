@@ -20,6 +20,13 @@ spring:
           lob:
             non_contextual_creation: true
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/ipitch}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8080/realms/ipitch/protocol/openid-connect/certs}
+
 server:
   port: 8081
 

@@ -24,7 +24,7 @@ data class Vote(
     val id: UUID? = null,
 
     @Column(nullable = false)
-    val userId: UUID,
+    val userId: String, // Keycloak user ID
 
     // Polymorphic reference to the entity being voted on
     @Column(nullable = false)

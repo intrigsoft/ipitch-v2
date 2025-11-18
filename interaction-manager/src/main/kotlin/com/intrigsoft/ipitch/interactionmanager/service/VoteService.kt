@@ -58,7 +58,7 @@ class VoteService(
     }
 
     @Transactional
-    fun deleteVote(voteId: UUID, userId: UUID): VoteResponse {
+    fun deleteVote(voteId: UUID, userId: String): VoteResponse {
         logger.info { "Deleting vote $voteId by user $userId" }
 
         val vote = voteRepository.findById(voteId).orElseThrow {
@@ -77,7 +77,7 @@ class VoteService(
     }
 
     @Transactional
-    fun removeVote(userId: UUID, targetType: VoteTargetType, targetId: UUID) {
+    fun removeVote(userId: String, targetType: VoteTargetType, targetId: UUID) {
         logger.info { "Removing vote for $targetType:$targetId by user $userId" }
 
         voteRepository.deleteByUserIdAndTargetTypeAndTargetId(userId, targetType, targetId)
@@ -96,7 +96,7 @@ class VoteService(
     }
 
     @Transactional(readOnly = true)
-    fun getUserVote(userId: UUID, targetType: VoteTargetType, targetId: UUID): VoteResponse? {
+    fun getUserVote(userId: String, targetType: VoteTargetType, targetId: UUID): VoteResponse? {
         logger.debug { "Fetching user vote for $targetType:$targetId by user $userId" }
 
         val vote = voteRepository.findByUserIdAndTargetTypeAndTargetId(
@@ -109,7 +109,7 @@ class VoteService(
     }
 
     @Transactional(readOnly = true)
-    fun getVoteStats(targetType: VoteTargetType, targetId: UUID, userId: UUID?): VoteStatsResponse {
+    fun getVoteStats(targetType: VoteTargetType, targetId: UUID, userId: String?): VoteStatsResponse {
         logger.debug { "Fetching vote stats for $targetType:$targetId" }
 
         val upvotes = voteRepository.countUpvotes(targetType, targetId)

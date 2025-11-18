@@ -19,7 +19,7 @@ data class Comment(
     val id: UUID? = null,
 
     @Column(nullable = false)
-    val userId: UUID,
+    val userId: String, // Keycloak user ID
 
     @Column(nullable = false, columnDefinition = "TEXT")
     var content: String,

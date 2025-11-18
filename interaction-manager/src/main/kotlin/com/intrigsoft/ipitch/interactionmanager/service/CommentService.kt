@@ -97,7 +97,7 @@ class CommentService(
     }
 
     @Transactional
-    fun updateComment(commentId: UUID, request: UpdateCommentRequest, userId: UUID): CommentResponse {
+    fun updateComment(commentId: UUID, request: UpdateCommentRequest, userId: String): CommentResponse {
         logger.info { "Updating comment $commentId by user $userId" }
 
         val comment = commentRepository.findById(commentId).orElseThrow {
@@ -126,7 +126,7 @@ class CommentService(
     }
 
     @Transactional
-    fun deleteComment(commentId: UUID, userId: UUID): CommentResponse {
+    fun deleteComment(commentId: UUID, userId: String): CommentResponse {
         logger.info { "Deleting comment $commentId by user $userId" }
 
         val comment = commentRepository.findById(commentId).orElseThrow {
@@ -152,7 +152,7 @@ class CommentService(
     }
 
     @Transactional(readOnly = true)
-    fun getComment(commentId: UUID, userId: UUID?): CommentResponse {
+    fun getComment(commentId: UUID, userId: String?): CommentResponse {
         logger.debug { "Fetching comment $commentId" }
 
         val comment = commentRepository.findById(commentId).orElseThrow {
@@ -166,7 +166,7 @@ class CommentService(
     fun getCommentsByTarget(
         targetType: CommentTargetType,
         targetId: UUID,
-        userId: UUID?
+        userId: String?
     ): List<CommentResponse> {
         logger.debug { "Fetching comments for target $targetType:$targetId" }
 
@@ -179,7 +179,7 @@ class CommentService(
     }
 
     @Transactional(readOnly = true)
-    fun getReplies(commentId: UUID, userId: UUID?): List<CommentResponse> {
+    fun getReplies(commentId: UUID, userId: String?): List<CommentResponse> {
         logger.debug { "Fetching replies for comment $commentId" }
 
         val comment = commentRepository.findById(commentId).orElseThrow {
@@ -192,7 +192,7 @@ class CommentService(
     }
 
     @Transactional(readOnly = true)
-    fun getUserComments(userId: UUID): List<CommentResponse> {
+    fun getUserComments(userId: String): List<CommentResponse> {
         logger.debug { "Fetching comments for user $userId" }
 
         val comments = commentRepository.findByUserIdAndDeletedFalse(userId)
@@ -200,7 +200,7 @@ class CommentService(
         return comments.map { toResponse(it, userId) }
     }
 
-    private fun toResponse(comment: Comment, userId: UUID?): CommentResponse {
+    private fun toResponse(comment: Comment, userId: String?): CommentResponse {
         val voteStats = voteService.getVoteStats(
             com.intrigsoft.ipitch.domain.VoteTargetType.COMMENT,
             comment.id!!,

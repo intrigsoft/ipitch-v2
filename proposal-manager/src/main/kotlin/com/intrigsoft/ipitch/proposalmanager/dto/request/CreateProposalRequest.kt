@@ -1,8 +1,6 @@
 package com.intrigsoft.ipitch.proposalmanager.dto.request
 
 import jakarta.validation.constraints.NotBlank
-import jakarta.validation.constraints.NotNull
-import java.util.*
 
 data class CreateProposalRequest(
     @field:NotBlank(message = "Title is required")
@@ -11,6 +9,6 @@ data class CreateProposalRequest(
     @field:NotBlank(message = "Content is required")
     val content: String,
 
-    @field:NotNull(message = "Owner ID is required")
-    val ownerId: UUID
+    // OwnerId will be set from JWT, but included here for flexibility
+    val ownerId: String = ""
 )

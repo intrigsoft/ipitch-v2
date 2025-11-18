@@ -33,6 +33,9 @@ class ProposalService(
         logger.info { "Creating new proposal: ${request.title} for owner ${request.ownerId}" }
 
         try {
+            // Get or create user for git attribution
+            val owner = getOrCreateUser(request.ownerId)
+
             // Create proposal in database
             val proposal = Proposal(
                 title = request.title,
@@ -44,11 +47,13 @@ class ProposalService(
             val savedProposal = proposalRepository.save(proposal)
             logger.info { "Proposal created in database with ID: ${savedProposal.id}" }
 
-            // Create proposal in Git
+            // Create proposal in Git with user's git credentials
             val workingBranch = gitService.createProposal(
                 savedProposal.id!!,
                 savedProposal.title,
-                savedProposal.content
+                savedProposal.content,
+                owner.getGitAuthorName(),
+                owner.getGitAuthorEmail()
             )
 
             // Update proposal with Git info
@@ -56,7 +61,7 @@ class ProposalService(
             savedProposal.updatedAt = LocalDateTime.now()
             val finalProposal = proposalRepository.save(savedProposal)
 
-            logger.info { "Proposal ${finalProposal.id} created successfully with working branch: $workingBranch" }
+            logger.info { "Proposal ${finalProposal.id} created successfully with working branch: $workingBranch by ${owner.getGitAuthorName()}" }
 
             return toProposalResponse(finalProposal)
         } catch (e: Exception) {
@@ -176,20 +181,19 @@ class ProposalService(
         }
 
         // Get user info for Git commit
-        val authorName = "User-${contributor.userId}"
-        val authorEmail = "${contributor.userId}@ipitch.com"
+        val user = getOrCreateUser(contributor.userId)
 
-        // Commit to Git
+        // Commit to Git with user's git credentials
         val commitHash = gitService.updateContent(
             proposalId = proposalId,
             contributorId = contributor.id!!,
             content = request.content,
             commitMessage = request.commitMessage,
-            authorName = authorName,
-            authorEmail = authorEmail
+            authorName = user.getGitAuthorName(),
+            authorEmail = user.getGitAuthorEmail()
         )
 
-        logger.info { "Content updated in Git with commit: $commitHash" }
+        logger.info { "Content updated in Git with commit: $commitHash by ${user.getGitAuthorName()}" }
 
         // Update proposal metadata
         proposal.content = request.content
@@ -221,20 +225,19 @@ class ProposalService(
         }
 
         // Get user info for Git commit
-        val authorName = "User-${contributor.userId}"
-        val authorEmail = "${contributor.userId}@ipitch.com"
+        val user = getOrCreateUser(contributor.userId)
 
-        // Commit to Git
+        // Commit to Git with user's git credentials
         val commitHash = gitService.updateTitle(
             proposalId = proposalId,
             contributorId = contributor.id!!,
             title = request.title,
             commitMessage = request.commitMessage,
-            authorName = authorName,
-            authorEmail = authorEmail
+            authorName = user.getGitAuthorName(),
+            authorEmail = user.getGitAuthorEmail()
         )
 
-        logger.info { "Title updated in Git with commit: $commitHash" }
+        logger.info { "Title updated in Git with commit: $commitHash by ${user.getGitAuthorName()}" }
 
         // Update proposal metadata
         proposal.title = request.title
@@ -285,7 +288,7 @@ class ProposalService(
     /**
      * 8. Merge pull request (only by proposal owner)
      */
-    fun mergePullRequest(proposalId: UUID, ownerId: UUID, request: MergePullRequestRequest): ApiResponse<String> {
+    fun mergePullRequest(proposalId: UUID, ownerId: String, request: MergePullRequestRequest): ApiResponse<String> {
         logger.info { "Merging pull request ${request.pullRequestId} for proposal $proposalId" }
 
         val proposal = proposalRepository.findById(proposalId)
@@ -318,7 +321,7 @@ class ProposalService(
     /**
      * 9. Publish proposal (merge to main and tag with version)
      */
-    fun publishProposal(proposalId: UUID, ownerId: UUID): ProposalResponse {
+    fun publishProposal(proposalId: UUID, ownerId: String): ProposalResponse {
         logger.info { "Publishing proposal $proposalId" }
 
         val proposal = proposalRepository.findById(proposalId)
@@ -401,7 +404,7 @@ class ProposalService(
     /**
      * 10. Revert proposal to previous version
      */
-    fun revertProposal(proposalId: UUID, ownerId: UUID): ProposalResponse {
+    fun revertProposal(proposalId: UUID, ownerId: String): ProposalResponse {
         logger.info { "Reverting proposal $proposalId" }
 
         val proposal = proposalRepository.findById(proposalId)
@@ -549,5 +552,22 @@ class ProposalService(
         val patch = parts.getOrNull(2)?.toIntOrNull() ?: 0
 
         return "$major.$minor.${patch + 1}"
+    }
+
+    /**
+     * Helper: Get or create user for git attribution
+     * Creates a basic user profile if the user doesn't exist yet
+     */
+    private fun getOrCreateUser(userId: String): User {
+        return userRepository.findById(userId).orElseGet {
+            logger.info { "User $userId not found, creating basic profile for git attribution" }
+            val user = User(
+                userId = userId,
+                userName = "User-$userId",
+                email = "$userId@ipitch.com",
+                status = UserStatus.ACTIVE
+            )
+            userRepository.save(user)
+        }
     }
 }

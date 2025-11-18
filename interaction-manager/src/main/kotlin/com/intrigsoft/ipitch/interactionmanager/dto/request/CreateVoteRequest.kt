@@ -6,8 +6,8 @@ import jakarta.validation.constraints.NotNull
 import java.util.*
 
 data class CreateVoteRequest(
-    @field:NotNull(message = "User ID is required")
-    val userId: UUID,
+    // UserId will be set from JWT, but included here for flexibility
+    val userId: String = "",
 
     @field:NotNull(message = "Target type is required")
     val targetType: VoteTargetType,
