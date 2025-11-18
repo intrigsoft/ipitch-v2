@@ -89,4 +89,47 @@ class UserService(
             userRepository.save(newUser)
         }
     }
+
+    /**
+     * Marks a user as dirty, indicating their scores need recalculation
+     */
+    @Transactional
+    fun markUserAsDirty(userId: String) {
+        val user = userRepository.findById(userId).orElse(null) ?: run {
+            logger.warn { "Cannot mark non-existent user as dirty: $userId" }
+            return
+        }
+
+        if (!user.dirty) {
+            user.dirty = true
+            userRepository.save(user)
+            logger.info { "Marked user as dirty: $userId" }
+        }
+    }
+
+    /**
+     * Marks multiple users as dirty
+     */
+    @Transactional
+    fun markUsersAsDirty(userIds: List<String>) {
+        userIds.forEach { userId ->
+            markUserAsDirty(userId)
+        }
+    }
+
+    /**
+     * Updates user scores and marks them as clean
+     */
+    @Transactional
+    fun updateUserScores(userId: String, scores: Map<String, Any>): User {
+        val user = getUserProfile(userId)
+        val updatedUser = user.copy(
+            scores = scores,
+            dirty = false,
+            updatedAt = LocalDateTime.now()
+        )
+
+        logger.info { "Updated scores for user $userId and marked as clean" }
+        return userRepository.save(updatedUser)
+    }
 }

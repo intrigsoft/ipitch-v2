@@ -14,7 +14,8 @@ import java.util.UUID
 @Service
 class UserAnalyticsService(
     private val proposalAnalysisRepository: ProposalAnalysisElasticsearchRepository,
-    private val commentAnalysisRepository: CommentAnalysisElasticsearchRepository
+    private val commentAnalysisRepository: CommentAnalysisElasticsearchRepository,
+    private val aiServiceFactory: AIServiceFactory
 ) {
 
     private val logger = KotlinLogging.logger {}
@@ -256,7 +257,211 @@ class UserAnalyticsService(
             .take(limit)
             .map { it.key to it.value }
     }
+
+    /**
+     * Calculate comprehensive user scores using AI analysis
+     * This combines comment analysis, proposal analysis, and commit data
+     * Returns a map of scores suitable for storing in the User.scores field
+     */
+    suspend fun calculateUserScores(
+        userId: String,
+        comments: List<CommentSummary>,
+        commits: List<CommitSummary>
+    ): Map<String, Any> {
+        logger.info { "Calculating AI-based user scores for user $userId" }
+
+        try {
+            // Get existing analytics
+            val proposalMetrics = getUserProposalMetrics(UUID.fromString(userId))
+            val commentMetrics = getUserCommentMetrics(UUID.fromString(userId))
+
+            // Build context for AI
+            val context = buildUserScoreContext(userId, comments, commits, proposalMetrics, commentMetrics)
+
+            // Call AI to calculate scores
+            val aiService = aiServiceFactory.getAIService()
+            val systemPrompt = """
+You are an expert in evaluating user contributions to a civic engagement platform.
+You analyze user comments and code contributions to proposals and calculate scores.
+Return ONLY a valid JSON object with the following structure:
+{
+  "overallQuality": <0-10>,
+  "contributionScore": <0-10>,
+  "sectorExpertise": {
+    "IT": <0-10>,
+    "Legal": <0-10>,
+    // ... other sectors
+  },
+  "engagementLevel": <0-10>,
+  "collaborationScore": <0-10>,
+  "consistency": <0-10>
 }
+            """.trimIndent()
+
+            val prompt = """
+Analyze the following user activity and calculate comprehensive scores:
+
+USER ID: $userId
+
+COMMENTS (${comments.size} total):
+${comments.take(20).joinToString("\n") { "- ${it.content.take(200)}" }}
+
+COMMITS (${commits.size} total):
+${commits.take(20).joinToString("\n") { "- ${it.message}" }}
+
+PROPOSAL METRICS:
+- Total proposals: ${proposalMetrics.totalProposals}
+- Average clarity score: ${proposalMetrics.averageClarityScore}
+- High quality proposals: ${proposalMetrics.highQualityProposalCount}
+- Sector expertise: ${proposalMetrics.sectorExpertise}
+
+COMMENT METRICS:
+- Total comments: ${commentMetrics.totalComments}
+- Flagged comments: ${commentMetrics.flaggedCommentCount} (${commentMetrics.flaggedCommentPercentage}%)
+- Average relevance: ${commentMetrics.averageRelevanceScore}
+- Mode distribution: ${commentMetrics.modeDistribution}
+
+Calculate comprehensive scores (0-10) for this user based on:
+1. Overall quality of contributions
+2. Contribution score (quantity and consistency)
+3. Sector expertise (which sectors they contribute to most effectively)
+4. Engagement level (how active they are)
+5. Collaboration score (how well they work with others)
+6. Consistency (how consistent their quality is over time)
+
+Return ONLY valid JSON.
+            """.trimIndent()
+
+            val response = aiService.generateStructuredResponse(prompt, systemPrompt)
+
+            // Parse AI response
+            val scores = parseAIScoresResponse(response)
+
+            logger.info { "Successfully calculated user scores for $userId" }
+            return scores
+        } catch (e: Exception) {
+            logger.error(e) { "Error calculating user scores for $userId" }
+
+            // Return default scores on error
+            return mapOf(
+                "overallQuality" to 5.0,
+                "contributionScore" to 5.0,
+                "engagementLevel" to 5.0,
+                "collaborationScore" to 5.0,
+                "consistency" to 5.0,
+                "error" to "Failed to calculate scores: ${e.message}"
+            )
+        }
+    }
+
+    /**
+     * Builds context string for AI analysis
+     */
+    private fun buildUserScoreContext(
+        userId: String,
+        comments: List<CommentSummary>,
+        commits: List<CommitSummary>,
+        proposalMetrics: UserProposalMetrics,
+        commentMetrics: UserCommentMetrics
+    ): String {
+        return """
+User Activity Summary:
+- User ID: $userId
+- Total Comments: ${comments.size}
+- Total Commits: ${commits.size}
+- Proposals Created: ${proposalMetrics.totalProposals}
+- Average Proposal Quality: ${proposalMetrics.averageClarityScore}/10
+- Flagged Comment Rate: ${commentMetrics.flaggedCommentPercentage}%
+- Comment Relevance: ${commentMetrics.averageRelevanceScore}/10
+        """.trimIndent()
+    }
+
+    /**
+     * Parses AI response to extract scores
+     */
+    private fun parseAIScoresResponse(response: String): Map<String, Any> {
+        try {
+            // Simple JSON parsing for the response
+            val scores = mutableMapOf<String, Any>()
+
+            // Extract numeric scores using regex
+            val overallQuality = extractScore(response, "overallQuality")
+            val contributionScore = extractScore(response, "contributionScore")
+            val engagementLevel = extractScore(response, "engagementLevel")
+            val collaborationScore = extractScore(response, "collaborationScore")
+            val consistency = extractScore(response, "consistency")
+
+            scores["overallQuality"] = overallQuality
+            scores["contributionScore"] = contributionScore
+            scores["engagementLevel"] = engagementLevel
+            scores["collaborationScore"] = collaborationScore
+            scores["consistency"] = consistency
+
+            // Extract sector expertise
+            val sectorExpertise = extractSectorScores(response)
+            if (sectorExpertise.isNotEmpty()) {
+                scores["sectorExpertise"] = sectorExpertise
+            }
+
+            return scores
+        } catch (e: Exception) {
+            logger.error(e) { "Error parsing AI scores response" }
+            return mapOf(
+                "overallQuality" to 5.0,
+                "error" to "Failed to parse AI response"
+            )
+        }
+    }
+
+    /**
+     * Extracts a numeric score from AI response
+     */
+    private fun extractScore(response: String, fieldName: String): Double {
+        val pattern = """"$fieldName":\s*(\d+\.?\d*)""".toRegex()
+        val match = pattern.find(response)
+        return match?.groupValues?.get(1)?.toDoubleOrNull() ?: 5.0
+    }
+
+    /**
+     * Extracts sector scores from AI response
+     */
+    private fun extractSectorScores(response: String): Map<String, Double> {
+        val sectorScores = mutableMapOf<String, Double>()
+        val sectorPattern = """"([A-Za-z]+)":\s*(\d+\.?\d*)""".toRegex()
+
+        // Find the sectorExpertise section
+        val sectorSection = response.substringAfter("sectorExpertise", "").substringBefore("}", "")
+
+        sectorPattern.findAll(sectorSection).forEach { match ->
+            val sector = match.groupValues[1]
+            val score = match.groupValues[2].toDoubleOrNull() ?: 0.0
+            if (score > 0) {
+                sectorScores[sector] = score
+            }
+        }
+
+        return sectorScores
+    }
+}
+
+/**
+ * Summary of a comment for scoring
+ */
+data class CommentSummary(
+    val id: String,
+    val content: String,
+    val createdAt: String
+)
+
+/**
+ * Summary of a commit for scoring
+ */
+data class CommitSummary(
+    val hash: String,
+    val message: String,
+    val timestamp: String,
+    val proposalId: String?
+)
 
 /**
  * User proposal quality metrics

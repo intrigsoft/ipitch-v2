@@ -24,7 +24,9 @@ private val logger = KotlinLogging.logger {}
 @Tag(name = "Proposal Management", description = "APIs for managing proposals with Git-based version control")
 @SecurityRequirement(name = "bearer-jwt")
 class ProposalController(
-    private val proposalService: ProposalService
+    private val proposalService: ProposalService,
+    private val gitService: com.intrigsoft.ipitch.proposalmanager.service.GitService,
+    private val userRepository: com.intrigsoft.ipitch.repository.UserRepository
 ) {
 
     @PostMapping
@@ -302,6 +304,47 @@ class ProposalController(
                 success = true,
                 message = "Proposals retrieved successfully",
                 data = proposals
+            )
+        )
+    }
+
+    @GetMapping("/commits/user/{userId}")
+    @Operation(
+        summary = "Get user commits",
+        description = "Retrieves all Git commits made by a specific user across all proposals"
+    )
+    fun getUserCommits(
+        @Parameter(description = "User ID (Keycloak ID)") @PathVariable userId: String
+    ): ResponseEntity<ApiResponse<List<com.intrigsoft.ipitch.proposalmanager.service.UserCommitInfo>>> {
+        logger.info { "API: Fetching commits for user $userId" }
+
+        // Get user's git credentials
+        val user = userRepository.findById(userId).orElse(null)
+
+        if (user == null) {
+            logger.warn { "User not found: $userId" }
+            return ResponseEntity.ok(
+                ApiResponse(
+                    success = true,
+                    message = "User not found, returning empty commit list",
+                    data = emptyList()
+                )
+            )
+        }
+
+        // Fetch commits using git credentials
+        val commits = gitService.getUserCommits(
+            gitEmail = user.getGitAuthorEmail(),
+            gitUsername = user.getGitAuthorName()
+        )
+
+        logger.info { "API: Found ${commits.size} commits for user $userId" }
+
+        return ResponseEntity.ok(
+            ApiResponse(
+                success = true,
+                message = "User commits retrieved successfully",
+                data = commits
             )
         )
     }

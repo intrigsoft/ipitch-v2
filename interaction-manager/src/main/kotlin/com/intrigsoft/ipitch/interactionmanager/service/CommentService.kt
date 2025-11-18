@@ -28,7 +28,8 @@ class CommentService(
     private val voteService: VoteService,
     private val elasticsearchSyncService: ElasticsearchSyncService,
     private val proposalRepository: ProposalRepository,
-    private val commentAnalysisService: CommentAnalysisService? = null
+    private val commentAnalysisService: CommentAnalysisService? = null,
+    private val userRepository: com.intrigsoft.ipitch.repository.UserRepository
 ) {
 
     @Transactional
@@ -57,6 +58,9 @@ class CommentService(
 
         val savedComment = commentRepository.save(comment)
         logger.info { "Comment created with id: ${savedComment.id}" }
+
+        // Mark user as dirty for score recalculation
+        markUserAsDirty(savedComment.userId)
 
         // AI Analysis: Perform governance check and content analysis
         try {
@@ -118,6 +122,9 @@ class CommentService(
 
         val updatedComment = commentRepository.save(comment)
         logger.info { "Comment updated: $commentId" }
+
+        // Mark user as dirty for score recalculation
+        markUserAsDirty(updatedComment.userId)
 
         // Sync to Elasticsearch
         elasticsearchSyncService.syncComment(updatedComment)
@@ -260,5 +267,21 @@ class CommentService(
         }
 
         return thread
+    }
+
+    /**
+     * Marks a user as dirty to trigger score recalculation
+     */
+    private fun markUserAsDirty(userId: String) {
+        try {
+            userRepository.findById(userId).ifPresent { user ->
+                user.dirty = true
+                userRepository.save(user)
+                logger.info { "Marked user $userId as dirty for score recalculation" }
+            }
+        } catch (e: Exception) {
+            logger.error(e) { "Failed to mark user $userId as dirty, but comment operation was successful" }
+            // Don't fail the comment operation if marking dirty fails
+        }
     }
 }

@@ -351,6 +351,9 @@ class ProposalService(
         proposal.updatedAt = LocalDateTime.now()
         val publishedProposal = proposalRepository.save(proposal)
 
+        // Mark all contributors (including owner) as dirty for score recalculation
+        markContributorsAsDirty(publishedProposal)
+
         // AI Analysis: Analyze proposal, generate summary, sector scores, clarity score, and index in vector DB
         try {
             proposalAnalysisService?.let {
@@ -568,6 +571,34 @@ class ProposalService(
                 status = UserStatus.ACTIVE
             )
             userRepository.save(user)
+        }
+    }
+
+    /**
+     * Marks all contributors (including owner) as dirty when a proposal is published
+     */
+    private fun markContributorsAsDirty(proposal: Proposal) {
+        try {
+            // Collect all user IDs (owner + contributors)
+            val userIds = mutableSetOf<String>()
+            userIds.add(proposal.ownerId)
+            proposal.contributors.forEach { contributor ->
+                userIds.add(contributor.userId)
+            }
+
+            // Mark all users as dirty
+            userIds.forEach { userId ->
+                userRepository.findById(userId).ifPresent { user ->
+                    user.dirty = true
+                    userRepository.save(user)
+                    logger.info { "Marked user $userId as dirty after proposal ${proposal.id} was published" }
+                }
+            }
+
+            logger.info { "Marked ${userIds.size} contributors as dirty for proposal ${proposal.id}" }
+        } catch (e: Exception) {
+            logger.error(e) { "Failed to mark contributors as dirty for proposal ${proposal.id}, but proposal was published successfully" }
+            // Don't fail the publication if marking dirty fails
         }
     }
 }
