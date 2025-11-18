@@ -8,7 +8,7 @@ data class ProposalResponse(
     val id: UUID,
     val title: String,
     val content: String,
-    val ownerId: UUID,
+    val ownerId: String, // Keycloak user ID
     val contributors: List<ContributorResponse>,
     val version: String,
     val status: ProposalStatus,

@@ -18,6 +18,7 @@ dependencies {
     // Kotlin Support
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 
     // Database
     implementation("org.postgresql:postgresql")

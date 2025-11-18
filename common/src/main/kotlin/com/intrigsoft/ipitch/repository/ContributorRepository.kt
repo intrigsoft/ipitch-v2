@@ -8,6 +8,6 @@ import java.util.*
 
 @Repository
 interface ContributorRepository : JpaRepository<Contributor, UUID> {
-    fun findByProposalAndUserId(proposal: Proposal, userId: UUID): Contributor?
+    fun findByProposalAndUserId(proposal: Proposal, userId: String): Contributor?
     fun findByProposal(proposal: Proposal): List<Contributor>
 }

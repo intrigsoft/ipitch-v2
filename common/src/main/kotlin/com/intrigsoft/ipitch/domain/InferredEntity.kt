@@ -56,9 +56,9 @@ data class InferredEntity(
     @Column(nullable = false)
     var updatedAt: LocalDateTime = LocalDateTime.now(),
 
-    // User who reviewed/approved the inferred entity
+    // User who reviewed/approved the inferred entity (Keycloak user ID)
     @Column
-    var reviewedBy: UUID? = null,
+    var reviewedBy: String? = null,
 
     @Column
     var reviewedAt: LocalDateTime? = null

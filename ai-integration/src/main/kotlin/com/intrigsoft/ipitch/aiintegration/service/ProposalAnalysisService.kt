@@ -74,7 +74,7 @@ class ProposalAnalysisService(
 
         // Create result
         val result = ProposalAnalysisResult(
-            proposalId = proposal.id,
+            proposalId = proposal.id!!,
             summary = analysis.summary,
             clarityScore = analysis.clarityScore,
             sectorScores = analysis.sectorScores,

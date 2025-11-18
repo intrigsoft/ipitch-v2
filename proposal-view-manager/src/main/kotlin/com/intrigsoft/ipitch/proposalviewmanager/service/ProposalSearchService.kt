@@ -78,12 +78,12 @@ class ProposalSearchService(
                     id = UUID.fromString(doc.id),
                     title = doc.title,
                     content = doc.content,
-                    ownerId = UUID.fromString(doc.ownerId),
+                    ownerId = doc.ownerId,
                     ownerName = doc.ownerName,
                     contributors = doc.contributors.map { contributor ->
-                        ContributorDto(
+                        ProposalSearchResponse.ContributorDto(
                             id = UUID.fromString(contributor.id),
-                            userId = UUID.fromString(contributor.userId),
+                            userId = contributor.userId,
                             userName = contributor.userName,
                             role = contributor.role,
                             status = contributor.status
@@ -124,12 +124,12 @@ class ProposalSearchService(
                 id = UUID.fromString(document.id),
                 title = document.title,
                 content = document.content,
-                ownerId = UUID.fromString(document.ownerId),
+                ownerId = document.ownerId,
                 ownerName = document.ownerName,
                 contributors = document.contributors.map { contributor ->
-                    ContributorDto(
+                    ProposalSearchResponse.ContributorDto(
                         id = UUID.fromString(contributor.id),
-                        userId = UUID.fromString(contributor.userId),
+                        userId = contributor.userId,
                         userName = contributor.userName,
                         role = contributor.role,
                         status = contributor.status

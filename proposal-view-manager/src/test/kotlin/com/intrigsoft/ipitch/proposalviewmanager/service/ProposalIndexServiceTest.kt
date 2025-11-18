@@ -37,12 +37,12 @@ class ProposalIndexServiceTest {
             id = testProposalId,
             title = "Test Proposal",
             content = "Test content",
-            ownerId = UUID.randomUUID(),
+            ownerId = "owner-${UUID.randomUUID()}",
             ownerName = "Test Owner",
             contributors = listOf(
                 ProposalPublishDto.ContributorDto(
                     id = UUID.randomUUID(),
-                    userId = UUID.randomUUID(),
+                    userId = "contributor-${UUID.randomUUID()}",
                     userName = "Contributor 1",
                     role = "reviewer",
                     status = ContributorStatus.ACTIVE.name

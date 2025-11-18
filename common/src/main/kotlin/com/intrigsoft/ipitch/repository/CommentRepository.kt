@@ -21,7 +21,7 @@ interface CommentRepository : JpaRepository<Comment, UUID> {
 
     fun findByParentCommentAndDeletedFalse(parentComment: Comment): List<Comment>
 
-    fun findByUserIdAndDeletedFalse(userId: UUID): List<Comment>
+    fun findByUserIdAndDeletedFalse(userId: String): List<Comment>
 
     @Query("""
         SELECT c FROM Comment c

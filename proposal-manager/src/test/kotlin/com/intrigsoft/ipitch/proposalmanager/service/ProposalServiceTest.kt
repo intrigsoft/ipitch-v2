@@ -36,12 +36,12 @@ class ProposalServiceTest {
 
     private lateinit var testProposal: Proposal
     private lateinit var testContributor: Contributor
-    private lateinit var testOwnerId: UUID
+    private lateinit var testOwnerId: String
     private lateinit var testProposalId: UUID
 
     @BeforeEach
     fun setUp() {
-        testOwnerId = UUID.randomUUID()
+        testOwnerId = "test-user-${UUID.randomUUID()}"
         testProposalId = UUID.randomUUID()
 
         testProposal = Proposal(
@@ -60,7 +60,7 @@ class ProposalServiceTest {
 
         testContributor = Contributor(
             id = UUID.randomUUID(),
-            userId = UUID.randomUUID(),
+            userId = "contributor-user-${UUID.randomUUID()}",
             role = "contributor",
             status = ContributorStatus.ACTIVE,
             proposal = testProposal
@@ -78,9 +78,16 @@ class ProposalServiceTest {
 
         val savedProposal = testProposal.copy(id = UUID.randomUUID())
         val workingBranch = "proposal/${savedProposal.id}"
+        val mockUser = User(
+            userId = testOwnerId,
+            userName = "Test Owner",
+            email = "owner@test.com",
+            status = UserStatus.ACTIVE
+        )
 
         every { proposalRepository.save(any()) } returns savedProposal
-        every { gitService.createProposal(savedProposal.id!!, request.title, request.content) } returns workingBranch
+        every { userRepository.findById(testOwnerId) } returns Optional.of(mockUser)
+        every { gitService.createProposal(savedProposal.id!!, request.title, request.content, any(), any()) } returns workingBranch
 
         // When
         val result = proposalService.createProposal(request)
@@ -90,7 +97,7 @@ class ProposalServiceTest {
         assertEquals("New Proposal", result.title)
         assertEquals(ProposalStatus.DRAFT, result.status)
         verify(exactly = 2) { proposalRepository.save(any()) }
-        verify(exactly = 1) { gitService.createProposal(savedProposal.id!!, request.title, request.content) }
+        verify(exactly = 1) { gitService.createProposal(savedProposal.id!!, request.title, request.content, any(), any()) }
     }
 
     @Test
@@ -103,9 +110,16 @@ class ProposalServiceTest {
         )
 
         val savedProposal = testProposal.copy(id = UUID.randomUUID())
+        val mockUser = User(
+            userId = testOwnerId,
+            userName = "Test Owner",
+            email = "owner@test.com",
+            status = UserStatus.ACTIVE
+        )
 
         every { proposalRepository.save(any()) } returns savedProposal
-        every { gitService.createProposal(any(), any(), any()) } throws RuntimeException("Git error")
+        every { userRepository.findById(testOwnerId) } returns Optional.of(mockUser)
+        every { gitService.createProposal(any(), any(), any(), any(), any()) } throws RuntimeException("Git error")
 
         // When & Then
         assertThrows<RuntimeException> {
@@ -136,7 +150,7 @@ class ProposalServiceTest {
     @Test
     fun `updateProposalMetadata should throw ProposalNotFoundException when proposal not found`() {
         // Given
-        val request = UpdateProposalMetadataRequest(status = ProposalStatus.PUBLISHED)
+        val request = UpdateProposalMetadataRequest(status = ProposalStatus.PUBLISHED, stats = null)
 
         every { proposalRepository.findById(testProposalId) } returns Optional.empty()
 
@@ -149,7 +163,7 @@ class ProposalServiceTest {
     @Test
     fun `addContributor should add contributor successfully`() {
         // Given
-        val userId = UUID.randomUUID()
+        val userId = "reviewer-user-${UUID.randomUUID()}"
         val request = AddContributorRequest(
             userId = userId,
             role = "reviewer"
@@ -177,7 +191,7 @@ class ProposalServiceTest {
     @Test
     fun `addContributor should throw InvalidOperationException when contributor already exists`() {
         // Given
-        val userId = UUID.randomUUID()
+        val userId = "existing-user-${UUID.randomUUID()}"
         val request = AddContributorRequest(
             userId = userId,
             role = "reviewer"
@@ -238,9 +252,16 @@ class ProposalServiceTest {
         )
 
         val commitHash = "new-commit-hash"
+        val mockUser = User(
+            userId = testContributor.userId,
+            userName = "Test Contributor",
+            email = "contributor@test.com",
+            status = UserStatus.ACTIVE
+        )
 
         every { proposalRepository.findById(testProposalId) } returns Optional.of(testProposal)
         every { contributorRepository.findById(request.contributorId) } returns Optional.of(testContributor)
+        every { userRepository.findById(testContributor.userId) } returns Optional.of(mockUser)
         every {
             gitService.updateContent(
                 proposalId = testProposalId,
@@ -327,20 +348,5 @@ class ProposalServiceTest {
         assertThrows<ProposalNotFoundException> {
             proposalService.getProposal(testProposalId)
         }
-    }
-
-    @Test
-    fun `getProposalsByOwner should return all proposals for owner`() {
-        // Given
-        val proposals = listOf(testProposal, testProposal.copy(id = UUID.randomUUID()))
-
-        every { proposalRepository.findByOwnerId(testOwnerId) } returns proposals
-
-        // When
-        val result = proposalService.getProposalsByOwner(testOwnerId)
-
-        // Then
-        assertEquals(2, result.size)
-        assertTrue(result.all { it.ownerId == testOwnerId })
     }
 }

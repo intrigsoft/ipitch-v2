@@ -17,6 +17,7 @@ dependencies {
 
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     implementation("org.postgresql:postgresql")
     implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.2.0")

@@ -25,7 +25,7 @@ class InferredEntityService(
 ) {
 
     @Transactional(readOnly = true)
-    fun getInferredEntity(id: UUID, userId: UUID?): InferredEntityResponse {
+    fun getInferredEntity(id: UUID, userId: String?): InferredEntityResponse {
         logger.debug { "Fetching inferred entity $id" }
 
         val entity = inferredEntityRepository.findById(id).orElseThrow {
@@ -38,7 +38,7 @@ class InferredEntityService(
     @Transactional(readOnly = true)
     fun getInferredEntitiesByProposal(
         proposalId: UUID,
-        userId: UUID?,
+        userId: String?,
         entityType: InferredEntityType? = null,
         status: InferredEntityStatus? = null
     ): List<InferredEntityResponse> {
@@ -61,7 +61,7 @@ class InferredEntityService(
     }
 
     @Transactional(readOnly = true)
-    fun getInferredEntitiesByComment(commentId: UUID, userId: UUID?): List<InferredEntityResponse> {
+    fun getInferredEntitiesByComment(commentId: UUID, userId: String?): List<InferredEntityResponse> {
         logger.debug { "Fetching inferred entities for comment $commentId" }
 
         val entities = inferredEntityRepository.findBySourceCommentId(commentId)
@@ -73,7 +73,7 @@ class InferredEntityService(
     fun updateStatus(
         id: UUID,
         status: InferredEntityStatus,
-        reviewerId: UUID
+        reviewerId: String
     ): InferredEntityResponse {
         logger.info { "Updating inferred entity $id status to $status" }
 
@@ -120,7 +120,7 @@ class InferredEntityService(
         return toResponse(updatedEntity, null)
     }
 
-    private fun toResponse(entity: InferredEntity, userId: UUID?): InferredEntityResponse {
+    private fun toResponse(entity: InferredEntity, userId: String?): InferredEntityResponse {
         val voteStats = voteService.getVoteStats(
             VoteTargetType.INFERRED_ENTITY,
             entity.id!!,

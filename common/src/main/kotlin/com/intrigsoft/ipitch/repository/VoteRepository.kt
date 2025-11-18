@@ -11,7 +11,7 @@ import java.util.*
 @Repository
 interface VoteRepository : JpaRepository<Vote, UUID> {
     fun findByUserIdAndTargetTypeAndTargetId(
-        userId: UUID,
+        userId: String,
         targetType: VoteTargetType,
         targetId: UUID
     ): Vote?
@@ -54,7 +54,7 @@ interface VoteRepository : JpaRepository<Vote, UUID> {
     fun getVoteScore(targetType: VoteTargetType, targetId: UUID): Long?
 
     fun deleteByUserIdAndTargetTypeAndTargetId(
-        userId: UUID,
+        userId: String,
         targetType: VoteTargetType,
         targetId: UUID
     )

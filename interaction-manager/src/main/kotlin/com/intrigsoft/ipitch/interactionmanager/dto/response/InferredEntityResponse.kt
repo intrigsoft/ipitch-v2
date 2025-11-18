@@ -18,7 +18,7 @@ data class InferredEntityResponse(
     val metadata: Map<String, Any>,
     val createdAt: LocalDateTime,
     val updatedAt: LocalDateTime,
-    val reviewedBy: UUID?,
+    val reviewedBy: String?, // Keycloak user ID
     val reviewedAt: LocalDateTime?,
     val voteStats: VoteStatsResponse,
     val commentCount: Long = 0

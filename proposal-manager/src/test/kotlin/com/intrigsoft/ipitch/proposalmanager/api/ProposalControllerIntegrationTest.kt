@@ -41,12 +41,12 @@ class ProposalControllerIntegrationTest {
     @Autowired
     private lateinit var contributorRepository: ContributorRepository
 
-    private lateinit var testOwnerId: UUID
+    private lateinit var testOwnerId: String
     private lateinit var gitRepoDir: File
 
     @BeforeEach
     fun setUp() {
-        testOwnerId = UUID.randomUUID()
+        testOwnerId = "test-user-${UUID.randomUUID()}"
         proposalRepository.deleteAll()
         contributorRepository.deleteAll()
 
@@ -87,7 +87,7 @@ class ProposalControllerIntegrationTest {
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data.title").value("Integration Test Proposal"))
-            .andExpect(jsonPath("$.data.ownerId").value(testOwnerId.toString()))
+            .andExpect(jsonPath("$.data.ownerId").value(testOwnerId))
             .andExpect(jsonPath("$.data.status").value("DRAFT"))
             .andExpect(jsonPath("$.data.workingBranch").exists())
     }
@@ -97,7 +97,7 @@ class ProposalControllerIntegrationTest {
         // Given - request with missing title
         val invalidRequest = mapOf(
             "content" to "Content without title",
-            "ownerId" to testOwnerId.toString()
+            "ownerId" to testOwnerId
         )
 
         // When & Then
@@ -143,7 +143,8 @@ class ProposalControllerIntegrationTest {
         // Given
         val nonExistentId = UUID.randomUUID()
         val updateRequest = UpdateProposalMetadataRequest(
-            status = ProposalStatus.PUBLISHED
+            status = ProposalStatus.PUBLISHED,
+            stats = null
         )
 
         // When & Then
@@ -169,7 +170,7 @@ class ProposalControllerIntegrationTest {
         val savedProposal = proposalRepository.save(proposal)
 
         val contributorRequest = AddContributorRequest(
-            userId = UUID.randomUUID(),
+            userId = "contributor-user-${UUID.randomUUID()}",
             role = "reviewer"
         )
 
@@ -181,7 +182,7 @@ class ProposalControllerIntegrationTest {
         )
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.data.userId").value(contributorRequest.userId.toString()))
+            .andExpect(jsonPath("$.data.userId").value(contributorRequest.userId))
             .andExpect(jsonPath("$.data.role").value("reviewer"))
             .andExpect(jsonPath("$.data.status").value("ACTIVE"))
     }
@@ -198,7 +199,7 @@ class ProposalControllerIntegrationTest {
         )
         val savedProposal = proposalRepository.save(proposal)
 
-        val contributorUserId = UUID.randomUUID()
+        val contributorUserId = "existing-contributor-${UUID.randomUUID()}"
         val existingContributor = Contributor(
             userId = contributorUserId,
             role = "reviewer",
@@ -235,7 +236,7 @@ class ProposalControllerIntegrationTest {
         val savedProposal = proposalRepository.save(proposal)
 
         val contributor = Contributor(
-            userId = UUID.randomUUID(),
+            userId = "contributor-${UUID.randomUUID()}",
             role = "reviewer",
             status = ContributorStatus.ACTIVE,
             proposal = savedProposal
@@ -309,7 +310,7 @@ class ProposalControllerIntegrationTest {
             Proposal(
                 title = "Other Proposal",
                 content = "Other Content",
-                ownerId = UUID.randomUUID(),
+                ownerId = "other-user-${UUID.randomUUID()}",
                 status = ProposalStatus.DRAFT,
                 workingBranch = "proposal/test3"
             )
@@ -338,7 +339,7 @@ class ProposalControllerIntegrationTest {
             Proposal(
                 title = "Proposal 2",
                 content = "Content 2",
-                ownerId = UUID.randomUUID(),
+                ownerId = "another-user-${UUID.randomUUID()}",
                 status = ProposalStatus.PUBLISHED,
                 workingBranch = "proposal/test2"
             )

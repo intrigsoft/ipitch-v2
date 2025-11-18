@@ -44,12 +44,12 @@ class InternalProposalControllerIntegrationTest {
             id = proposalId,
             title = "Test Proposal",
             content = "Test content",
-            ownerId = UUID.randomUUID(),
+            ownerId = "owner-${UUID.randomUUID()}",
             ownerName = "Test Owner",
             contributors = listOf(
                 ProposalPublishDto.ContributorDto(
                     id = UUID.randomUUID(),
-                    userId = UUID.randomUUID(),
+                    userId = "contributor-${UUID.randomUUID()}",
                     userName = "Contributor",
                     role = "reviewer",
                     status = ContributorStatus.ACTIVE.name
@@ -88,7 +88,7 @@ class InternalProposalControllerIntegrationTest {
             id = proposalId,
             title = "Test Proposal",
             content = "Test content",
-            ownerId = UUID.randomUUID(),
+            ownerId = "owner-${UUID.randomUUID()}",
             ownerName = "Test Owner",
             contributors = emptyList(),
             version = "1.0.0",
@@ -155,7 +155,7 @@ class InternalProposalControllerIntegrationTest {
             id = proposalId,
             title = "Minimal Proposal",
             content = "Content",
-            ownerId = UUID.randomUUID(),
+            ownerId = "owner-${UUID.randomUUID()}",
             ownerName = null,
             contributors = emptyList(),
             version = "1.0.0",

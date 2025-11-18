@@ -36,7 +36,7 @@ data class ProposalPublishDto(
     val id: java.util.UUID,
     val title: String,
     val content: String,
-    val ownerId: java.util.UUID,
+    val ownerId: String, // Keycloak user ID
     val ownerName: String? = null,
     val contributors: List<ContributorDto> = emptyList(),
     val version: String,
@@ -50,7 +50,7 @@ data class ProposalPublishDto(
 
 data class ContributorDto(
     val id: java.util.UUID,
-    val userId: java.util.UUID,
+    val userId: String, // Keycloak user ID
     val userName: String? = null,
     val role: String,
     val status: String

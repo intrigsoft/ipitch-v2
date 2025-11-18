@@ -15,9 +15,9 @@ dependencies {
     api("org.springframework.boot:spring-boot-starter-oauth2-resource-server:3.3.5")
 
     // Kotlin
-    api("org.jetbrains.kotlin:kotlin-reflect")
-    api("com.fasterxml.jackson.module:jackson-module-kotlin")
+    api(kotlin("reflect"))
+    api("com.fasterxml.jackson.module:jackson-module-kotlin:2.17.2")
 
     // PostgreSQL
-    api("org.postgresql:postgresql")
+    api("org.postgresql:postgresql:42.7.4")
 }

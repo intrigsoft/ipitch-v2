@@ -5,7 +5,7 @@ import java.util.*
 
 data class ContributorResponse(
     val id: UUID,
-    val userId: UUID,
+    val userId: String, // Keycloak user ID
     val role: String,
     val status: ContributorStatus
 )

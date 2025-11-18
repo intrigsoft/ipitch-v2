@@ -39,5 +39,6 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test:3.3.5")
     testImplementation("io.mockk:mockk:1.13.8")
     testImplementation("com.ninja-squad:springmockk:4.0.2")
-    testImplementation("com.h2database:h2")
+    // Explicit version because this module doesn't apply Spring Boot's dependency management
+    testImplementation("com.h2database:h2:2.2.224")
 }

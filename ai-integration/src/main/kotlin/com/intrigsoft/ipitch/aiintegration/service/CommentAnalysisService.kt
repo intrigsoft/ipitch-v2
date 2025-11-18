@@ -71,7 +71,7 @@ class CommentAnalysisService(
         val fullAnalysis = performFullAnalysis(comment, proposal, commentThread)
 
         val result = CommentAnalysisResult(
-            commentId = comment.id,
+            commentId = comment.id!!,
             governanceFlags = governanceResult.flags,
             governanceScore = governanceResult.score,
             isFlagged = false,

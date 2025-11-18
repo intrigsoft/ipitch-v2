@@ -9,5 +9,5 @@ data class UpdateInferredEntityStatusRequest(
     val status: InferredEntityStatus,
 
     @field:NotNull(message = "Reviewer ID is required")
-    val reviewerId: UUID
+    val reviewerId: String // Keycloak user ID
 )

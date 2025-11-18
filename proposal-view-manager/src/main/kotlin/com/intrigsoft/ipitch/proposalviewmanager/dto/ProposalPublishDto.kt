@@ -12,7 +12,7 @@ data class ProposalPublishDto(
     val id: UUID,
     val title: String,
     val content: String,
-    val ownerId: UUID,
+    val ownerId: String, // Keycloak user ID
     val ownerName: String? = null,
     val contributors: List<ContributorDto> = emptyList(),
     val version: String,
@@ -22,12 +22,12 @@ data class ProposalPublishDto(
     val gitCommitHash: String? = null,
     val createdAt: LocalDateTime,
     val updatedAt: LocalDateTime
-)
-
-data class ContributorDto(
-    val id: UUID,
-    val userId: UUID,
-    val userName: String? = null,
-    val role: String,
-    val status: String
-)
+) {
+    data class ContributorDto(
+        val id: UUID,
+        val userId: String, // Keycloak user ID
+        val userName: String? = null,
+        val role: String,
+        val status: String
+    )
+}

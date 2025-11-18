@@ -37,7 +37,7 @@ abstract class BaseSecurityConfig {
     }
 
     @Bean
-    fun jwtAuthenticationConverter(): JwtAuthenticationConverter {
+    open fun jwtAuthenticationConverter(): JwtAuthenticationConverter {
         val converter = JwtAuthenticationConverter()
         converter.setJwtGrantedAuthoritiesConverter { jwt ->
             val realmAccess = jwt.getClaimAsMap("realm_access")

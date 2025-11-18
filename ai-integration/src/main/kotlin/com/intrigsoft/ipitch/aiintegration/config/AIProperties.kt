@@ -7,7 +7,6 @@ import org.springframework.context.annotation.Configuration
 /**
  * Configuration properties for AI services
  */
-@Configuration
 @ConfigurationProperties(prefix = "ai")
 data class AIProperties(
     var provider: AIProvider = AIProvider.OPENAI,

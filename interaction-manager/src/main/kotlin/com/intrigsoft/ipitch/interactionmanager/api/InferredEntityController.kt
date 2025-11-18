@@ -28,7 +28,7 @@ class InferredEntityController(
     @Operation(summary = "Get an inferred entity by ID")
     fun getInferredEntity(
         @PathVariable id: UUID,
-        @RequestParam(required = false) userId: UUID?
+        @RequestParam(required = false) userId: String?
     ): ResponseEntity<ApiResponse<InferredEntityResponse>> {
         logger.info { "Fetching inferred entity $id" }
         val entity = inferredEntityService.getInferredEntity(id, userId)
@@ -39,7 +39,7 @@ class InferredEntityController(
     @Operation(summary = "Get all inferred entities for a proposal")
     fun getInferredEntitiesByProposal(
         @PathVariable proposalId: UUID,
-        @RequestParam(required = false) userId: UUID?,
+        @RequestParam(required = false) userId: String?,
         @RequestParam(required = false) entityType: InferredEntityType?,
         @RequestParam(required = false) status: InferredEntityStatus?
     ): ResponseEntity<ApiResponse<List<InferredEntityResponse>>> {
@@ -57,7 +57,7 @@ class InferredEntityController(
     @Operation(summary = "Get all inferred entities extracted from a comment")
     fun getInferredEntitiesByComment(
         @PathVariable commentId: UUID,
-        @RequestParam(required = false) userId: UUID?
+        @RequestParam(required = false) userId: String?
     ): ResponseEntity<ApiResponse<List<InferredEntityResponse>>> {
         logger.info { "Fetching inferred entities for comment $commentId" }
         val entities = inferredEntityService.getInferredEntitiesByComment(commentId, userId)

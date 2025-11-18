@@ -8,7 +8,7 @@ import java.util.*
 
 data class VoteResponse(
     val id: UUID,
-    val userId: UUID,
+    val userId: String,
     val targetType: VoteTargetType,
     val targetId: UUID,
     val voteType: VoteType,

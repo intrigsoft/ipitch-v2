@@ -5,6 +5,9 @@ import com.intrigsoft.ipitch.domain.Vote
 import com.intrigsoft.ipitch.domain.VoteTargetType
 import com.intrigsoft.ipitch.domain.VoteType
 import com.intrigsoft.ipitch.interactionmanager.dto.request.CreateVoteRequest
+import com.intrigsoft.ipitch.interactionmanager.search.CommentSearchRepository
+import com.intrigsoft.ipitch.interactionmanager.search.InferredEntitySearchRepository
+import com.intrigsoft.ipitch.interactionmanager.search.ProposalSearchRepository
 import com.intrigsoft.ipitch.repository.VoteRepository
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -12,6 +15,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
@@ -33,12 +37,24 @@ class VoteControllerIntegrationTest {
     @Autowired
     private lateinit var voteRepository: VoteRepository
 
-    private lateinit var testUserId: UUID
+    @MockBean
+    private lateinit var commentSearchRepository: CommentSearchRepository
+
+    @MockBean
+    private lateinit var proposalSearchRepository: ProposalSearchRepository
+
+    @MockBean
+    private lateinit var inferredEntitySearchRepository: InferredEntitySearchRepository
+
+    @MockBean
+    private lateinit var commentAnalysisService: com.intrigsoft.ipitch.aiintegration.service.CommentAnalysisService
+
+    private lateinit var testUserId: String
     private lateinit var testTargetId: UUID
 
     @BeforeEach
     fun setUp() {
-        testUserId = UUID.randomUUID()
+        testUserId = "user-${UUID.randomUUID()}"
         testTargetId = UUID.randomUUID()
         voteRepository.deleteAll()
     }
@@ -234,7 +250,7 @@ class VoteControllerIntegrationTest {
         // Given - create multiple votes
         voteRepository.save(
             Vote(
-                userId = UUID.randomUUID(),
+                userId = "user-${UUID.randomUUID()}",
                 targetType = VoteTargetType.PROPOSAL,
                 targetId = testTargetId,
                 voteType = VoteType.UP
@@ -242,7 +258,7 @@ class VoteControllerIntegrationTest {
         )
         voteRepository.save(
             Vote(
-                userId = UUID.randomUUID(),
+                userId = "user-${UUID.randomUUID()}",
                 targetType = VoteTargetType.PROPOSAL,
                 targetId = testTargetId,
                 voteType = VoteType.UP
@@ -250,7 +266,7 @@ class VoteControllerIntegrationTest {
         )
         voteRepository.save(
             Vote(
-                userId = UUID.randomUUID(),
+                userId = "user-${UUID.randomUUID()}",
                 targetType = VoteTargetType.PROPOSAL,
                 targetId = testTargetId,
                 voteType = VoteType.DOWN
@@ -275,7 +291,7 @@ class VoteControllerIntegrationTest {
         // Given
         voteRepository.save(
             Vote(
-                userId = UUID.randomUUID(),
+                userId = "user-${UUID.randomUUID()}",
                 targetType = VoteTargetType.PROPOSAL,
                 targetId = testTargetId,
                 voteType = VoteType.UP
@@ -283,7 +299,7 @@ class VoteControllerIntegrationTest {
         )
         voteRepository.save(
             Vote(
-                userId = UUID.randomUUID(),
+                userId = "user-${UUID.randomUUID()}",
                 targetType = VoteTargetType.PROPOSAL,
                 targetId = testTargetId,
                 voteType = VoteType.DOWN

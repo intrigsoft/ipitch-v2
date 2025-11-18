@@ -30,12 +30,12 @@ class VoteServiceTest {
     private lateinit var voteService: VoteService
 
     private lateinit var testVote: Vote
-    private lateinit var testUserId: UUID
+    private lateinit var testUserId: String
     private lateinit var testTargetId: UUID
 
     @BeforeEach
     fun setUp() {
-        testUserId = UUID.randomUUID()
+        testUserId = "user-${UUID.randomUUID()}"
         testTargetId = UUID.randomUUID()
         testVote = Vote(
             id = UUID.randomUUID(),
@@ -114,7 +114,7 @@ class VoteServiceTest {
     fun `deleteVote should throw UnauthorizedOperationException when user is not authorized`() {
         // Given
         val voteId = testVote.id!!
-        val unauthorizedUserId = UUID.randomUUID()
+        val unauthorizedUserId = "unauthorized-user-${UUID.randomUUID()}"
         every { voteRepository.findById(voteId) } returns Optional.of(testVote)
 
         // When & Then

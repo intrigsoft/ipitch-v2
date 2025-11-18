@@ -39,13 +39,13 @@ class InferredEntityServiceTest {
     private lateinit var inferredEntityService: InferredEntityService
 
     private lateinit var testEntity: InferredEntity
-    private lateinit var testUserId: UUID
+    private lateinit var testUserId: String
     private lateinit var testProposalId: UUID
     private lateinit var testCommentId: UUID
 
     @BeforeEach
     fun setUp() {
-        testUserId = UUID.randomUUID()
+        testUserId = "user-${UUID.randomUUID()}"
         testProposalId = UUID.randomUUID()
         testCommentId = UUID.randomUUID()
         testEntity = InferredEntity(
@@ -249,7 +249,7 @@ class InferredEntityServiceTest {
     fun `updateStatus should update entity status and set reviewer info`() {
         // Given
         val entityId = testEntity.id!!
-        val reviewerId = UUID.randomUUID()
+        val reviewerId = "reviewer-${UUID.randomUUID()}"
         val voteStats = VoteStatsResponse(upvotes = 0, downvotes = 0, score = 0, userVote = null)
 
         every { inferredEntityRepository.findById(entityId) } returns Optional.of(testEntity)
@@ -284,7 +284,7 @@ class InferredEntityServiceTest {
     fun `updateStatus should throw InferredEntityNotFoundException when entity does not exist`() {
         // Given
         val entityId = UUID.randomUUID()
-        val reviewerId = UUID.randomUUID()
+        val reviewerId = "reviewer-${UUID.randomUUID()}"
 
         every { inferredEntityRepository.findById(entityId) } returns Optional.empty()
 

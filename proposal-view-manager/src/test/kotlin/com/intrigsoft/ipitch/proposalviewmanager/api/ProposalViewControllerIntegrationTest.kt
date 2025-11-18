@@ -1,7 +1,6 @@
 package com.intrigsoft.ipitch.proposalviewmanager.api
 
 import com.intrigsoft.ipitch.domain.ProposalStatus
-import com.intrigsoft.ipitch.proposalviewmanager.dto.ContributorDto
 import com.intrigsoft.ipitch.proposalviewmanager.dto.PagedProposalSearchResponse
 import com.intrigsoft.ipitch.proposalviewmanager.dto.ProposalSearchResponse
 import com.intrigsoft.ipitch.proposalviewmanager.service.ProposalSearchService
@@ -33,7 +32,7 @@ class ProposalViewControllerIntegrationTest {
     fun `searchProposals should return results with default parameters`() {
         // Given
         val proposalId = UUID.randomUUID()
-        val ownerId = UUID.randomUUID()
+        val ownerId = "owner-${UUID.randomUUID()}"
         val searchResponse = ProposalSearchResponse(
             id = proposalId,
             title = "Test Proposal",
@@ -64,6 +63,7 @@ class ProposalViewControllerIntegrationTest {
             .andExpect(jsonPath("$.content.length()").value(1))
             .andExpect(jsonPath("$.content[0].id").value(proposalId.toString()))
             .andExpect(jsonPath("$.content[0].title").value("Test Proposal"))
+            .andExpect(jsonPath("$.content[0].ownerId").value(ownerId))
             .andExpect(jsonPath("$.totalElements").value(1))
             .andExpect(jsonPath("$.totalPages").value(1))
             .andExpect(jsonPath("$.page").value(0))
@@ -78,7 +78,7 @@ class ProposalViewControllerIntegrationTest {
             id = proposalId,
             title = "Matching Proposal",
             content = "Content",
-            ownerId = UUID.randomUUID(),
+            ownerId = "owner-${UUID.randomUUID()}",
             ownerName = "Owner",
             contributors = emptyList(),
             version = "1.0.0",
@@ -108,7 +108,7 @@ class ProposalViewControllerIntegrationTest {
     @Test
     fun `searchProposals should filter by ownerId and status`() {
         // Given
-        val ownerId = UUID.randomUUID()
+        val ownerId = "owner-${UUID.randomUUID()}"
         val proposalId = UUID.randomUUID()
         val searchResponse = ProposalSearchResponse(
             id = proposalId,
@@ -137,12 +137,12 @@ class ProposalViewControllerIntegrationTest {
         // When & Then
         mockMvc.perform(
             get("/api/v1/proposals/search")
-                .param("ownerId", ownerId.toString())
+                .param("ownerId", ownerId)
                 .param("status", "PUBLISHED")
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.content.length()").value(1))
-            .andExpect(jsonPath("$.content[0].ownerId").value(ownerId.toString()))
+            .andExpect(jsonPath("$.content[0].ownerId").value(ownerId))
             .andExpect(jsonPath("$.content[0].status").value("PUBLISHED"))
     }
 
@@ -180,7 +180,7 @@ class ProposalViewControllerIntegrationTest {
             id = proposalId,
             title = "Proposal",
             content = "Content",
-            ownerId = UUID.randomUUID(),
+            ownerId = "owner-${UUID.randomUUID()}",
             ownerName = "Owner",
             contributors = emptyList(),
             version = "1.0.0",
@@ -244,9 +244,9 @@ class ProposalViewControllerIntegrationTest {
     fun `searchProposals should return proposals with contributors`() {
         // Given
         val proposalId = UUID.randomUUID()
-        val contributorDto = ContributorDto(
+        val contributorDto = ProposalSearchResponse.ContributorDto(
             id = UUID.randomUUID(),
-            userId = UUID.randomUUID(),
+            userId = "contributor-${UUID.randomUUID()}",
             userName = "Contributor Name",
             role = "reviewer",
             status = "ACTIVE"
@@ -256,7 +256,7 @@ class ProposalViewControllerIntegrationTest {
             id = proposalId,
             title = "Proposal With Contributors",
             content = "Content",
-            ownerId = UUID.randomUUID(),
+            ownerId = "owner-${UUID.randomUUID()}",
             ownerName = "Owner",
             contributors = listOf(contributorDto),
             version = "1.0.0",
@@ -293,7 +293,7 @@ class ProposalViewControllerIntegrationTest {
             id = proposalId,
             title = "Single Proposal",
             content = "Content",
-            ownerId = UUID.randomUUID(),
+            ownerId = "owner-${UUID.randomUUID()}",
             ownerName = "Owner",
             contributors = emptyList(),
             version = "1.0.0",

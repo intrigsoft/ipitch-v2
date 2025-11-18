@@ -33,22 +33,22 @@ class ProposalSearchServiceTest {
 
     private lateinit var testDocument: ProposalDocument
     private lateinit var testDocuments: List<ProposalDocument>
-    private lateinit var testOwnerId: UUID
+    private lateinit var testOwnerId: String
 
     @BeforeEach
     fun setUp() {
-        testOwnerId = UUID.randomUUID()
+        testOwnerId = "test-owner-${UUID.randomUUID()}"
 
         testDocument = ProposalDocument(
             id = UUID.randomUUID().toString(),
             title = "Test Proposal",
             content = "Test content",
-            ownerId = testOwnerId.toString(),
+            ownerId = testOwnerId,
             ownerName = "Test Owner",
             contributors = listOf(
                 ContributorDocument(
                     id = UUID.randomUUID().toString(),
-                    userId = UUID.randomUUID().toString(),
+                    userId = "contributor-${UUID.randomUUID()}",
                     userName = "Contributor",
                     role = "reviewer",
                     status = "ACTIVE"
@@ -103,7 +103,7 @@ class ProposalSearchServiceTest {
     fun `searchProposals should return results when filtering by owner and status`() {
         // Given
         val request = ProposalSearchRequest(
-            ownerId = testOwnerId.toString(),
+            ownerId = testOwnerId,
             status = ProposalStatus.PUBLISHED,
             page = 0,
             size = 10
@@ -113,7 +113,7 @@ class ProposalSearchServiceTest {
 
         every {
             proposalDocumentRepository.findByOwnerIdAndStatus(
-                testOwnerId.toString(),
+                testOwnerId,
                 ProposalStatus.PUBLISHED.name,
                 any()
             )
@@ -132,7 +132,7 @@ class ProposalSearchServiceTest {
     fun `searchProposals should return results when filtering by owner only`() {
         // Given
         val request = ProposalSearchRequest(
-            ownerId = testOwnerId.toString(),
+            ownerId = testOwnerId,
             page = 0,
             size = 10
         )
@@ -140,7 +140,7 @@ class ProposalSearchServiceTest {
         val page = PageImpl(testDocuments, pageable, testDocuments.size.toLong())
 
         every {
-            proposalDocumentRepository.findByOwnerId(testOwnerId.toString(), any())
+            proposalDocumentRepository.findByOwnerId(testOwnerId, any())
         } returns page
 
         // When

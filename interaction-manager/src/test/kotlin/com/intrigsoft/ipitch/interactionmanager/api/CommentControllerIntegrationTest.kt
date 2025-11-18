@@ -5,6 +5,9 @@ import com.intrigsoft.ipitch.domain.Comment
 import com.intrigsoft.ipitch.domain.CommentTargetType
 import com.intrigsoft.ipitch.interactionmanager.dto.request.CreateCommentRequest
 import com.intrigsoft.ipitch.interactionmanager.dto.request.UpdateCommentRequest
+import com.intrigsoft.ipitch.interactionmanager.search.CommentSearchRepository
+import com.intrigsoft.ipitch.interactionmanager.search.InferredEntitySearchRepository
+import com.intrigsoft.ipitch.interactionmanager.search.ProposalSearchRepository
 import com.intrigsoft.ipitch.repository.CommentRepository
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -12,6 +15,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
@@ -19,9 +23,17 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import java.util.*
 
-@SpringBootTest
-@AutoConfigureMockMvc
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureMockMvc(addFilters = false)
 @ActiveProfiles("test")
+@org.springframework.test.context.TestPropertySource(
+    properties = [
+        "spring.datasource.url=jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
+        "spring.datasource.driver-class-name=org.h2.Driver",
+        "spring.jpa.hibernate.ddl-auto=create-drop",
+        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration"
+    ]
+)
 class CommentControllerIntegrationTest {
 
     @Autowired
@@ -33,12 +45,24 @@ class CommentControllerIntegrationTest {
     @Autowired
     private lateinit var commentRepository: CommentRepository
 
-    private lateinit var testUserId: UUID
+    @MockBean
+    private lateinit var commentSearchRepository: CommentSearchRepository
+
+    @MockBean
+    private lateinit var proposalSearchRepository: ProposalSearchRepository
+
+    @MockBean
+    private lateinit var inferredEntitySearchRepository: InferredEntitySearchRepository
+
+    @MockBean
+    private lateinit var commentAnalysisService: com.intrigsoft.ipitch.aiintegration.service.CommentAnalysisService
+
+    private lateinit var testUserId: String
     private lateinit var testTargetId: UUID
 
     @BeforeEach
     fun setUp() {
-        testUserId = UUID.randomUUID()
+        testUserId = "user-${UUID.randomUUID()}"
         testTargetId = UUID.randomUUID()
         commentRepository.deleteAll()
     }

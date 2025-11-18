@@ -6,6 +6,9 @@ import com.intrigsoft.ipitch.domain.InferredEntityStatus
 import com.intrigsoft.ipitch.domain.InferredEntityType
 import com.intrigsoft.ipitch.interactionmanager.dto.request.UpdateInferredEntityContentRequest
 import com.intrigsoft.ipitch.interactionmanager.dto.request.UpdateInferredEntityStatusRequest
+import com.intrigsoft.ipitch.interactionmanager.search.CommentSearchRepository
+import com.intrigsoft.ipitch.interactionmanager.search.InferredEntitySearchRepository
+import com.intrigsoft.ipitch.interactionmanager.search.ProposalSearchRepository
 import com.intrigsoft.ipitch.repository.InferredEntityRepository
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -13,6 +16,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
@@ -33,6 +37,18 @@ class InferredEntityControllerIntegrationTest {
 
     @Autowired
     private lateinit var inferredEntityRepository: InferredEntityRepository
+
+    @MockBean
+    private lateinit var commentSearchRepository: CommentSearchRepository
+
+    @MockBean
+    private lateinit var proposalSearchRepository: ProposalSearchRepository
+
+    @MockBean
+    private lateinit var inferredEntitySearchRepository: InferredEntitySearchRepository
+
+    @MockBean
+    private lateinit var commentAnalysisService: com.intrigsoft.ipitch.aiintegration.service.CommentAnalysisService
 
     private lateinit var testProposalId: UUID
     private lateinit var testCommentId: UUID
@@ -229,7 +245,7 @@ class InferredEntityControllerIntegrationTest {
         )
         val savedEntity = inferredEntityRepository.save(entity)
 
-        val reviewerId = UUID.randomUUID()
+        val reviewerId = "reviewer-${UUID.randomUUID()}"
         val request = UpdateInferredEntityStatusRequest(
             status = InferredEntityStatus.APPROVED,
             reviewerId = reviewerId

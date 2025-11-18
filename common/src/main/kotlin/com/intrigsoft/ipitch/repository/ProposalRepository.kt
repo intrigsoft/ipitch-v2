@@ -7,5 +7,5 @@ import java.util.*
 
 @Repository
 interface ProposalRepository : JpaRepository<Proposal, UUID> {
-    fun findByOwnerId(ownerId: UUID): List<Proposal>
+    fun findByOwnerId(ownerId: String): List<Proposal>
 }

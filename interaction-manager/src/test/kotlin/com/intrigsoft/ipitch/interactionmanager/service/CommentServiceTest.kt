@@ -34,16 +34,19 @@ class CommentServiceTest {
     @MockK
     private lateinit var elasticsearchSyncService: ElasticsearchSyncService
 
+    @MockK
+    private lateinit var proposalRepository: com.intrigsoft.ipitch.repository.ProposalRepository
+
     @InjectMockKs
     private lateinit var commentService: CommentService
 
     private lateinit var testComment: Comment
-    private lateinit var testUserId: UUID
+    private lateinit var testUserId: String
     private lateinit var testTargetId: UUID
 
     @BeforeEach
     fun setUp() {
-        testUserId = UUID.randomUUID()
+        testUserId = "user-${UUID.randomUUID()}"
         testTargetId = UUID.randomUUID()
         testComment = Comment(
             id = UUID.randomUUID(),
@@ -194,7 +197,7 @@ class CommentServiceTest {
         // Given
         val commentId = testComment.id!!
         val request = UpdateCommentRequest(content = "Updated content")
-        val unauthorizedUserId = UUID.randomUUID()
+        val unauthorizedUserId = "unauthorized-user-${UUID.randomUUID()}"
 
         every { commentRepository.findById(commentId) } returns Optional.of(testComment)
 
@@ -262,7 +265,7 @@ class CommentServiceTest {
     fun `deleteComment should throw UnauthorizedOperationException when user is not owner`() {
         // Given
         val commentId = testComment.id!!
-        val unauthorizedUserId = UUID.randomUUID()
+        val unauthorizedUserId = "unauthorized-user-${UUID.randomUUID()}"
 
         every { commentRepository.findById(commentId) } returns Optional.of(testComment)
 
