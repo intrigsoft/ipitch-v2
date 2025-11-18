@@ -11,7 +11,7 @@ data class Contributor(
     val id: UUID? = null,
 
     @Column(nullable = false)
-    val userId: UUID,
+    val userId: String, // Keycloak user ID
 
     @Column(nullable = false)
     val role: String,

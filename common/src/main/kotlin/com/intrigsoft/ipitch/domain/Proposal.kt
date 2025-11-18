@@ -20,7 +20,7 @@ data class Proposal(
     var content: String,
 
     @Column(nullable = false)
-    val ownerId: UUID,
+    val ownerId: String, // Keycloak user ID
 
     @OneToMany(mappedBy = "proposal", cascade = [CascadeType.ALL], orphanRemoval = true, fetch = FetchType.EAGER)
     val contributors: MutableList<Contributor> = mutableListOf(),

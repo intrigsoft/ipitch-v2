@@ -37,8 +37,12 @@ class UserService(
             description = request.description ?: user.description,
             avatarUrl = request.avatarUrl ?: user.avatarUrl,
             viewPermissions = request.viewPermissions ?: user.viewPermissions,
+            gitUsername = request.gitUsername ?: user.gitUsername,
+            gitEmail = request.gitEmail ?: user.gitEmail,
             updatedAt = LocalDateTime.now()
         )
+
+        logger.info { "Updated user profile for $userId. Git credentials configured: ${updatedUser.gitUsername != null && updatedUser.gitEmail != null}" }
 
         return userRepository.save(updatedUser)
     }

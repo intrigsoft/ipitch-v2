@@ -36,12 +36,29 @@ data class User(
     @Column(name = "view_permissions", columnDefinition = "jsonb", nullable = false)
     val viewPermissions: UserViewPermissions = UserViewPermissions(),
 
+    // Git user information for commit attribution
+    @Column(name = "git_username")
+    val gitUsername: String? = null,
+
+    @Column(name = "git_email")
+    val gitEmail: String? = null,
+
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),
 
     @Column(name = "updated_at", nullable = false)
     val updatedAt: LocalDateTime = LocalDateTime.now()
-)
+) {
+    /**
+     * Gets the git author name, defaulting to userName if gitUsername is not set
+     */
+    fun getGitAuthorName(): String = gitUsername ?: userName
+
+    /**
+     * Gets the git author email, defaulting to email if gitEmail is not set
+     */
+    fun getGitAuthorEmail(): String = gitEmail ?: email
+}
 
 enum class UserStatus {
     ACTIVE,

@@ -55,8 +55,8 @@ class GitService(
     /**
      * Creates a new proposal directory and working branch
      */
-    fun createProposal(proposalId: UUID, title: String, content: String): String {
-        logger.info { "Creating proposal $proposalId in Git repository" }
+    fun createProposal(proposalId: UUID, title: String, content: String, authorName: String, authorEmail: String): String {
+        logger.info { "Creating proposal $proposalId in Git repository by $authorName" }
 
         val branchName = "proposal/$proposalId"
         val proposalDir = File(repoPath.toFile(), proposalId.toString())
@@ -91,7 +91,7 @@ class GitService(
 
             val commit = git.commit()
                 .setMessage("Create proposal: $title")
-                .setAuthor("System", "system@ipitch.com")
+                .setAuthor(authorName, authorEmail)
                 .call()
 
             logger.info { "Created initial commit for proposal $proposalId: ${commit.name}" }

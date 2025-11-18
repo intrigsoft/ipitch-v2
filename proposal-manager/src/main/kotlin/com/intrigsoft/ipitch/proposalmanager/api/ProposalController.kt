@@ -1,15 +1,19 @@
 package com.intrigsoft.ipitch.proposalmanager.api
 
+import com.intrigsoft.ipitch.config.SecurityUtils
 import com.intrigsoft.ipitch.proposalmanager.dto.request.*
 import com.intrigsoft.ipitch.proposalmanager.dto.response.*
 import com.intrigsoft.ipitch.proposalmanager.service.ProposalService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
+import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.*
 import java.util.*
 
@@ -18,6 +22,7 @@ private val logger = KotlinLogging.logger {}
 @RestController
 @RequestMapping("/api/proposals")
 @Tag(name = "Proposal Management", description = "APIs for managing proposals with Git-based version control")
+@SecurityRequirement(name = "bearer-jwt")
 class ProposalController(
     private val proposalService: ProposalService
 ) {
@@ -25,14 +30,18 @@ class ProposalController(
     @PostMapping
     @Operation(
         summary = "Create a new proposal",
-        description = "Creates a new proposal in the database and initializes a Git repository structure with a working branch"
+        description = "Creates a new proposal in the database and initializes a Git repository structure with a working branch. The authenticated user becomes the owner."
     )
     fun createProposal(
+        @AuthenticationPrincipal jwt: Jwt,
         @Valid @RequestBody request: CreateProposalRequest
     ): ResponseEntity<ApiResponse<ProposalResponse>> {
-        logger.info { "API: Creating proposal with title: ${request.title}" }
+        val userId = jwt.subject
+        logger.info { "API: User $userId creating proposal with title: ${request.title}" }
 
-        val proposal = proposalService.createProposal(request)
+        // Override ownerId with authenticated user to ensure security
+        val secureRequest = request.copy(ownerId = userId)
+        val proposal = proposalService.createProposal(secureRequest)
 
         logger.info { "API: Proposal created successfully with ID: ${proposal.id}" }
 
@@ -189,11 +198,12 @@ class ProposalController(
         description = "Merges a pull request into the proposal's working branch (owner only)"
     )
     fun mergePullRequest(
+        @AuthenticationPrincipal jwt: Jwt,
         @Parameter(description = "Proposal ID") @PathVariable proposalId: UUID,
-        @Parameter(description = "Owner User ID") @RequestParam ownerId: UUID,
         @Valid @RequestBody request: MergePullRequestRequest
     ): ResponseEntity<ApiResponse<String>> {
-        logger.info { "API: Merging pull request ${request.pullRequestId} for proposal $proposalId" }
+        val ownerId = jwt.subject
+        logger.info { "API: User $ownerId merging pull request ${request.pullRequestId} for proposal $proposalId" }
 
         val response = proposalService.mergePullRequest(proposalId, ownerId, request)
 
@@ -205,13 +215,14 @@ class ProposalController(
     @PostMapping("/{proposalId}/publish")
     @Operation(
         summary = "Publish a proposal",
-        description = "Publishes the proposal by merging to main branch and creating a version tag"
+        description = "Publishes the proposal by merging to main branch and creating a version tag (owner only)"
     )
     fun publishProposal(
-        @Parameter(description = "Proposal ID") @PathVariable proposalId: UUID,
-        @Parameter(description = "Owner User ID") @RequestParam ownerId: UUID
+        @AuthenticationPrincipal jwt: Jwt,
+        @Parameter(description = "Proposal ID") @PathVariable proposalId: UUID
     ): ResponseEntity<ApiResponse<ProposalResponse>> {
-        logger.info { "API: Publishing proposal $proposalId by owner $ownerId" }
+        val ownerId = jwt.subject
+        logger.info { "API: User $ownerId publishing proposal $proposalId" }
 
         val proposal = proposalService.publishProposal(proposalId, ownerId)
 
@@ -229,13 +240,14 @@ class ProposalController(
     @PostMapping("/{proposalId}/revert")
     @Operation(
         summary = "Revert a proposal to previous version",
-        description = "Reverts a published proposal to its previous version. If it's the first version, marks it as DRAFT and removes from search index. Otherwise, reverts to the previous version and updates the search index."
+        description = "Reverts a published proposal to its previous version (owner only). If it's the first version, marks it as DRAFT and removes from search index. Otherwise, reverts to the previous version and updates the search index."
     )
     fun revertProposal(
-        @Parameter(description = "Proposal ID") @PathVariable proposalId: UUID,
-        @Parameter(description = "Owner User ID") @RequestParam ownerId: UUID
+        @AuthenticationPrincipal jwt: Jwt,
+        @Parameter(description = "Proposal ID") @PathVariable proposalId: UUID
     ): ResponseEntity<ApiResponse<ProposalResponse>> {
-        logger.info { "API: Reverting proposal $proposalId by owner $ownerId" }
+        val ownerId = jwt.subject
+        logger.info { "API: User $ownerId reverting proposal $proposalId" }
 
         val proposal = proposalService.revertProposal(proposalId, ownerId)
 
