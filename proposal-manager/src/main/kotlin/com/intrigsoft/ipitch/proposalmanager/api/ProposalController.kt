@@ -348,4 +348,50 @@ class ProposalController(
             )
         )
     }
+
+    @GetMapping("/{proposalId}/suggestions")
+    @Operation(
+        summary = "Get proposal suggestions",
+        description = "Retrieves all AI-extracted suggestions for a proposal, aggregated from comments with similarity detection"
+    )
+    fun getProposalSuggestions(
+        @Parameter(description = "Proposal ID") @PathVariable proposalId: UUID
+    ): ResponseEntity<ApiResponse<List<SuggestionResponse>>> {
+        logger.info { "API: Fetching suggestions for proposal $proposalId" }
+
+        val suggestions = proposalService.getSuggestionsForProposal(proposalId)
+
+        logger.info { "API: Found ${suggestions.size} suggestions for proposal $proposalId" }
+
+        return ResponseEntity.ok(
+            ApiResponse(
+                success = true,
+                message = "Suggestions retrieved successfully",
+                data = suggestions
+            )
+        )
+    }
+
+    @GetMapping("/{proposalId}/concerns")
+    @Operation(
+        summary = "Get proposal concerns",
+        description = "Retrieves all AI-extracted concerns for a proposal, aggregated from comments with similarity detection"
+    )
+    fun getProposalConcerns(
+        @Parameter(description = "Proposal ID") @PathVariable proposalId: UUID
+    ): ResponseEntity<ApiResponse<List<ConcernResponse>>> {
+        logger.info { "API: Fetching concerns for proposal $proposalId" }
+
+        val concerns = proposalService.getConcernsForProposal(proposalId)
+
+        logger.info { "API: Found ${concerns.size} concerns for proposal $proposalId" }
+
+        return ResponseEntity.ok(
+            ApiResponse(
+                success = true,
+                message = "Concerns retrieved successfully",
+                data = concerns
+            )
+        )
+    }
 }

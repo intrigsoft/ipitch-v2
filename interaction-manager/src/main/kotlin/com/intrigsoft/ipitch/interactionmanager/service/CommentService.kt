@@ -29,7 +29,8 @@ class CommentService(
     private val elasticsearchSyncService: ElasticsearchSyncService,
     private val proposalRepository: ProposalRepository,
     private val commentAnalysisService: CommentAnalysisService? = null,
-    private val userRepository: com.intrigsoft.ipitch.repository.UserRepository
+    private val userRepository: com.intrigsoft.ipitch.repository.UserRepository,
+    private val suggestionConcernService: com.intrigsoft.ipitch.aiintegration.service.SuggestionConcernService? = null
 ) {
 
     @Transactional
@@ -83,6 +84,9 @@ class CommentService(
                         } else {
                             logger.info { "Comment ${savedComment.id} analysis completed successfully" }
                             logger.info { "Relevance: ${analysisResult.relevanceScore}, Mode: ${analysisResult.mode}, Marketing: ${analysisResult.isMarketing}" }
+
+                            // Extract suggestions and concerns from the comment
+                            extractSuggestionsAndConcerns(savedComment, proposal, commentThread)
                         }
                     } else {
                         logger.warn { "Could not find proposal for comment ${savedComment.id}, skipping AI analysis" }
@@ -282,6 +286,66 @@ class CommentService(
         } catch (e: Exception) {
             logger.error(e) { "Failed to mark user $userId as dirty, but comment operation was successful" }
             // Don't fail the comment operation if marking dirty fails
+        }
+    }
+
+    /**
+     * Extract suggestions and concerns from a comment and store them
+     * This is called after comment analysis if the comment is not flagged
+     */
+    private suspend fun extractSuggestionsAndConcerns(
+        comment: Comment,
+        proposal: Proposal,
+        commentThread: List<Comment>
+    ) {
+        try {
+            suggestionConcernService?.let { service ->
+                logger.info { "Extracting suggestions and concerns from comment ${comment.id}" }
+
+                // Extract suggestions and concerns
+                val extraction = service.extractSuggestionsAndConcerns(comment, proposal, commentThread)
+
+                logger.info { "Extracted ${extraction.suggestions.size} suggestions and ${extraction.concerns.size} concerns from comment ${comment.id}" }
+
+                // Process suggestions with similarity detection
+                if (extraction.suggestions.isNotEmpty()) {
+                    val suggestionResults = service.processSuggestions(
+                        proposalId = proposal.id!!,
+                        commentId = comment.id!!,
+                        suggestions = extraction.suggestions
+                    )
+
+                    suggestionResults.forEach { result ->
+                        if (result.isNew) {
+                            logger.info { "Created new suggestion ${result.suggestionId} for proposal ${proposal.id}" }
+                        } else {
+                            logger.info { "Linked to existing suggestion ${result.suggestionId} (similarity: ${result.similarityScore})" }
+                        }
+                    }
+                }
+
+                // Process concerns with similarity detection
+                if (extraction.concerns.isNotEmpty()) {
+                    val concernResults = service.processConcerns(
+                        proposalId = proposal.id!!,
+                        commentId = comment.id!!,
+                        concerns = extraction.concerns
+                    )
+
+                    concernResults.forEach { result ->
+                        if (result.isNew) {
+                            logger.info { "Created new concern ${result.concernId} for proposal ${proposal.id}" }
+                        } else {
+                            logger.info { "Linked to existing concern ${result.concernId} (similarity: ${result.similarityScore})" }
+                        }
+                    }
+                }
+
+                logger.info { "Successfully processed suggestions and concerns for comment ${comment.id}" }
+            } ?: logger.warn { "SuggestionConcernService not available, skipping suggestion/concern extraction" }
+        } catch (e: Exception) {
+            logger.error(e) { "Error extracting suggestions/concerns from comment ${comment.id}, but comment was saved successfully" }
+            // Don't fail the comment creation if extraction fails
         }
     }
 }

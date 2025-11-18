@@ -23,7 +23,8 @@ class ProposalService(
     private val userRepository: UserRepository,
     private val gitService: GitService,
     private val proposalViewManagerClient: com.intrigsoft.ipitch.proposalmanager.client.ProposalViewManagerClient,
-    private val proposalAnalysisService: ProposalAnalysisService? = null
+    private val proposalAnalysisService: ProposalAnalysisService? = null,
+    private val suggestionConcernService: com.intrigsoft.ipitch.aiintegration.service.SuggestionConcernService? = null
 ) {
 
     /**
@@ -600,5 +601,39 @@ class ProposalService(
             logger.error(e) { "Failed to mark contributors as dirty for proposal ${proposal.id}, but proposal was published successfully" }
             // Don't fail the publication if marking dirty fails
         }
+    }
+
+    /**
+     * Get all suggestions for a proposal
+     */
+    @Transactional(readOnly = true)
+    fun getSuggestionsForProposal(proposalId: UUID): List<SuggestionResponse> {
+        logger.debug { "Fetching suggestions for proposal $proposalId" }
+
+        // Verify proposal exists
+        proposalRepository.findById(proposalId).orElseThrow {
+            throw ProposalNotFoundException(proposalId)
+        }
+
+        return suggestionConcernService?.getSuggestionsForProposal(proposalId)
+            ?.map { SuggestionResponse.from(it) }
+            ?: emptyList()
+    }
+
+    /**
+     * Get all concerns for a proposal
+     */
+    @Transactional(readOnly = true)
+    fun getConcernsForProposal(proposalId: UUID): List<ConcernResponse> {
+        logger.debug { "Fetching concerns for proposal $proposalId" }
+
+        // Verify proposal exists
+        proposalRepository.findById(proposalId).orElseThrow {
+            throw ProposalNotFoundException(proposalId)
+        }
+
+        return suggestionConcernService?.getConcernsForProposal(proposalId)
+            ?.map { ConcernResponse.from(it) }
+            ?: emptyList()
     }
 }
