@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: ipitch-postgres
     environment:
       POSTGRES_DB: ipitch
@@ -12,6 +12,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # Initialize databases and enable pgvector on both ipitch and ipitch_interactions
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d
     networks:
       - ipitch-network
     healthcheck:

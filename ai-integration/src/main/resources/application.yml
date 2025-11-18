@@ -1,48 +1,3 @@
-spring:
-  application:
-    name: interaction-manager
-
-  datasource:
-    url: jdbc:postgresql://localhost:5432/ipitch_interactions
-    username: ipitch
-    password: ipitch123
-    driver-class-name: org.postgresql.Driver
-
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
-        jdbc:
-          lob:
-            non_contextual_creation: true
-
-  elasticsearch:
-    uris: http://localhost:9200
-    connection-timeout: 5s
-    socket-timeout: 60s
-
-server:
-  port: 8083
-
-# Swagger/OpenAPI Configuration
-springdoc:
-  api-docs:
-    path: /api-docs
-  swagger-ui:
-    path: /swagger-ui.html
-    enabled: true
-
-logging:
-  level:
-    com.intrigsoft.ipitch: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
-
-# AI Integration Configuration
 ai:
   provider: openai  # Options: openai, anthropic, local
 
@@ -62,17 +17,19 @@ ai:
     max-retries: 3
 
   local:
-    base-url: ${LOCAL_AI_URL:http://localhost:11434}
+    base-url: ${LOCAL_AI_URL:http://localhost:11434}  # For Ollama or similar
     model: llama2
     embedding-model: nomic-embed-text
     timeout: 120000
 
+  # RAG configuration
   rag:
     top-k: 5
     similarity-threshold: 0.7
     chunk-size: 1000
     chunk-overlap: 200
 
+  # Sector configuration (can be moved to database later)
   sectors:
     enabled:
       - IT
@@ -88,6 +45,7 @@ ai:
       - Energy
       - Manufacturing
 
+  # Content moderation settings
   moderation:
     enabled: true
     auto-flag-threshold: 0.8
@@ -101,5 +59,30 @@ ai:
       - spam
 
 vector-db:
-  embedding-dimension: 3072
-  similarity-function: cosine
+  embedding-dimension: 3072  # text-embedding-3-large dimension
+  similarity-function: cosine  # Options: cosine, l2, inner_product
+
+# Spring configuration
+spring:
+  # PostgreSQL datasource configuration for vector database
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/ipitch}
+    username: ${DATABASE_USER:ipitch}
+    password: ${DATABASE_PASSWORD:ipitch123}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          lob:
+            non_contextual_creation: true
+
+  # Elasticsearch configuration for analysis results indexing
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+    connection-timeout: 5s
+    socket-timeout: 60s
