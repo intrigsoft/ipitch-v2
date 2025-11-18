@@ -7,11 +7,14 @@ import com.intrigsoft.ipitch.interactionmanager.dto.response.VoteResponse
 import com.intrigsoft.ipitch.interactionmanager.dto.response.VoteStatsResponse
 import com.intrigsoft.ipitch.interactionmanager.service.VoteService
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.*
 import java.util.*
 
@@ -20,41 +23,49 @@ private val logger = KotlinLogging.logger {}
 @RestController
 @RequestMapping("/api/votes")
 @Tag(name = "Votes", description = "API for managing votes")
+@SecurityRequirement(name = "bearer-jwt")
 class VoteController(
     private val voteService: VoteService
 ) {
 
     @PostMapping
-    @Operation(summary = "Create or update a vote")
+    @Operation(summary = "Create or update a vote", description = "Creates or updates a vote by the authenticated user")
     fun createOrUpdateVote(
+        @AuthenticationPrincipal jwt: Jwt,
         @Valid @RequestBody request: CreateVoteRequest
     ): ResponseEntity<ApiResponse<VoteResponse>> {
-        logger.info { "Creating/updating vote for ${request.targetType}:${request.targetId}" }
-        val vote = voteService.createOrUpdateVote(request)
+        val userId = jwt.subject
+        logger.info { "User $userId creating/updating vote for ${request.targetType}:${request.targetId}" }
+
+        // Override userId with authenticated user to ensure security
+        val secureRequest = request.copy(userId = userId)
+        val vote = voteService.createOrUpdateVote(secureRequest)
         return ResponseEntity
             .status(HttpStatus.CREATED)
             .body(ApiResponse.success("Vote saved successfully", vote))
     }
 
     @DeleteMapping("/{voteId}")
-    @Operation(summary = "Delete a vote")
+    @Operation(summary = "Delete a vote", description = "Deletes a vote. Only the vote owner can delete it.")
     fun deleteVote(
-        @PathVariable voteId: UUID,
-        @RequestParam userId: UUID
+        @AuthenticationPrincipal jwt: Jwt,
+        @PathVariable voteId: UUID
     ): ResponseEntity<ApiResponse<VoteResponse>> {
-        logger.info { "Deleting vote $voteId" }
+        val userId = jwt.subject
+        logger.info { "User $userId deleting vote $voteId" }
         val vote = voteService.deleteVote(voteId, userId)
         return ResponseEntity.ok(ApiResponse.success("Vote deleted successfully", vote))
     }
 
     @DeleteMapping
-    @Operation(summary = "Remove a user's vote on a target")
+    @Operation(summary = "Remove a user's vote on a target", description = "Removes the authenticated user's vote on a specific target")
     fun removeVote(
-        @RequestParam userId: UUID,
+        @AuthenticationPrincipal jwt: Jwt,
         @RequestParam targetType: VoteTargetType,
         @RequestParam targetId: UUID
     ): ResponseEntity<ApiResponse<Nothing>> {
-        logger.info { "Removing vote for $targetType:$targetId by user $userId" }
+        val userId = jwt.subject
+        logger.info { "User $userId removing vote for $targetType:$targetId" }
         voteService.removeVote(userId, targetType, targetId)
         return ResponseEntity.ok(ApiResponse.success("Vote removed successfully"))
     }
@@ -70,13 +81,14 @@ class VoteController(
     }
 
     @GetMapping("/user")
-    @Operation(summary = "Get a user's vote on a specific target")
+    @Operation(summary = "Get own vote on a specific target")
     fun getUserVote(
-        @RequestParam userId: UUID,
+        @AuthenticationPrincipal jwt: Jwt,
         @RequestParam targetType: VoteTargetType,
         @RequestParam targetId: UUID
     ): ResponseEntity<ApiResponse<VoteResponse?>> {
-        logger.info { "Fetching user vote for $targetType:$targetId by user $userId" }
+        val userId = jwt.subject
+        logger.info { "User $userId fetching own vote for $targetType:$targetId" }
         val vote = voteService.getUserVote(userId, targetType, targetId)
         return ResponseEntity.ok(ApiResponse.success("User vote retrieved successfully", vote))
     }
@@ -84,10 +96,11 @@ class VoteController(
     @GetMapping("/stats")
     @Operation(summary = "Get vote statistics for a target")
     fun getVoteStats(
+        @AuthenticationPrincipal jwt: Jwt?,
         @RequestParam targetType: VoteTargetType,
-        @RequestParam targetId: UUID,
-        @RequestParam(required = false) userId: UUID?
+        @RequestParam targetId: UUID
     ): ResponseEntity<ApiResponse<VoteStatsResponse>> {
+        val userId = jwt?.subject
         logger.info { "Fetching vote stats for $targetType:$targetId" }
         val stats = voteService.getVoteStats(targetType, targetId, userId)
         return ResponseEntity.ok(ApiResponse.success("Vote stats retrieved successfully", stats))
