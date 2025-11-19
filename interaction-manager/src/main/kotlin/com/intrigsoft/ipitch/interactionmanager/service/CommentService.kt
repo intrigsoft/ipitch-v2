@@ -35,17 +35,21 @@ class CommentService(
 
     @Transactional
     fun createComment(request: CreateCommentRequest): CommentResponse {
-        logger.info { "Creating comment for target ${request.targetType}:${request.targetId} by user ${request.userId}" }
+        val startTime = System.currentTimeMillis()
+        logger.info { "[COMMENT] Creating comment - targetType: ${request.targetType}, targetId: ${request.targetId}, userId: ${request.userId}, contentLength: ${request.content.length}, parentId: ${request.parentCommentId}" }
 
         // Validate parent comment if provided
         val parentComment = request.parentCommentId?.let {
-            commentRepository.findById(it).orElseThrow {
+            val parent = commentRepository.findById(it).orElseThrow {
                 throw InvalidOperationException("Parent comment not found with id: $it")
             }
+            logger.debug { "[COMMENT] Parent comment found - id: $it, userId: ${parent.userId}" }
+            parent
         }
 
         // Validate that parent comment is not deleted
         if (parentComment?.deleted == true) {
+            logger.warn { "[COMMENT] Attempted to reply to deleted comment - parentId: ${parentComment.id}" }
             throw InvalidOperationException("Cannot reply to a deleted comment")
         }
 
@@ -58,7 +62,7 @@ class CommentService(
         )
 
         val savedComment = commentRepository.save(comment)
-        logger.info { "Comment created with id: ${savedComment.id}" }
+        logger.info { "[COMMENT] Comment created - id: ${savedComment.id}, userId: ${savedComment.userId}, targetType: ${savedComment.targetType}" }
 
         // Mark user as dirty for score recalculation
         markUserAsDirty(savedComment.userId)
@@ -67,7 +71,7 @@ class CommentService(
         try {
             commentAnalysisService?.let { analysisService ->
                 runBlocking {
-                    logger.info { "Starting AI analysis for comment ${savedComment.id}" }
+                    logger.info { "[COMMENT] Starting AI analysis - commentId: ${savedComment.id}" }
 
                     // Get the proposal for context
                     val proposal = getProposalForComment(savedComment)
@@ -76,48 +80,56 @@ class CommentService(
                     val commentThread = buildCommentThread(savedComment)
 
                     if (proposal != null) {
+                        logger.debug { "[COMMENT] Proposal context - proposalId: ${proposal.id}, title: '${proposal.title}'" }
                         val analysisResult = analysisService.analyzeComment(savedComment, proposal, commentThread)
 
                         if (analysisResult.isFlagged) {
-                            logger.warn { "Comment ${savedComment.id} flagged: ${analysisResult.flagReason}" }
-                            logger.info { "Governance flags: ${analysisResult.governanceFlags}" }
+                            logger.warn { "[COMMENT] Comment flagged - commentId: ${savedComment.id}, reason: ${analysisResult.flagReason}, flags: ${analysisResult.governanceFlags}" }
                         } else {
-                            logger.info { "Comment ${savedComment.id} analysis completed successfully" }
-                            logger.info { "Relevance: ${analysisResult.relevanceScore}, Mode: ${analysisResult.mode}, Marketing: ${analysisResult.isMarketing}" }
+                            logger.info { "[COMMENT] AI analysis completed - commentId: ${savedComment.id}, relevance: ${analysisResult.relevanceScore}, mode: ${analysisResult.mode}, marketing: ${analysisResult.isMarketing}" }
 
                             // Extract suggestions and concerns from the comment
                             extractSuggestionsAndConcerns(savedComment, proposal, commentThread)
                         }
                     } else {
-                        logger.warn { "Could not find proposal for comment ${savedComment.id}, skipping AI analysis" }
+                        logger.warn { "[COMMENT] No proposal context found for comment ${savedComment.id}, skipping AI analysis" }
                     }
                 }
-            } ?: logger.warn { "CommentAnalysisService not available, skipping AI analysis" }
+            } ?: logger.warn { "[COMMENT] CommentAnalysisService not available, skipping AI analysis for comment ${savedComment.id}" }
         } catch (e: Exception) {
-            logger.error(e) { "Error during AI analysis for comment ${savedComment.id}, but comment was saved successfully" }
+            logger.error(e) { "[COMMENT] AI analysis failed for comment ${savedComment.id}, error: ${e.message}" }
             // Don't fail the comment creation if AI analysis fails
         }
 
         // Sync to Elasticsearch asynchronously
         elasticsearchSyncService.syncComment(savedComment)
 
+        val duration = System.currentTimeMillis() - startTime
+        logger.info { "[COMMENT] Comment creation completed - id: ${savedComment.id}, duration: ${duration}ms" }
+
         return toResponse(savedComment, request.userId)
     }
 
     @Transactional
     fun updateComment(commentId: UUID, request: UpdateCommentRequest, userId: String): CommentResponse {
-        logger.info { "Updating comment $commentId by user $userId" }
+        val startTime = System.currentTimeMillis()
+        logger.info { "[COMMENT] Updating comment - commentId: $commentId, userId: $userId, newContentLength: ${request.content.length}" }
 
         val comment = commentRepository.findById(commentId).orElseThrow {
             throw CommentNotFoundException(commentId)
         }
 
+        val oldContent = comment.content
+        val oldContentLength = oldContent.length
+
         // Check authorization
         if (comment.userId != userId) {
+            logger.warn { "[COMMENT] Unauthorized update attempt - commentId: $commentId, attemptedBy: $userId, owner: ${comment.userId}" }
             throw UnauthorizedOperationException("You are not authorized to update this comment")
         }
 
         if (comment.deleted) {
+            logger.warn { "[COMMENT] Attempted to update deleted comment - commentId: $commentId" }
             throw InvalidOperationException("Cannot update a deleted comment")
         }
 
@@ -125,7 +137,7 @@ class CommentService(
         comment.updatedAt = LocalDateTime.now()
 
         val updatedComment = commentRepository.save(comment)
-        logger.info { "Comment updated: $commentId" }
+        logger.info { "[COMMENT] Comment updated - commentId: $commentId, oldLength: $oldContentLength, newLength: ${request.content.length}" }
 
         // Mark user as dirty for score recalculation
         markUserAsDirty(updatedComment.userId)
@@ -133,19 +145,26 @@ class CommentService(
         // Sync to Elasticsearch
         elasticsearchSyncService.syncComment(updatedComment)
 
+        val duration = System.currentTimeMillis() - startTime
+        logger.info { "[COMMENT] Comment update completed - commentId: $commentId, duration: ${duration}ms" }
+
         return toResponse(updatedComment, userId)
     }
 
     @Transactional
     fun deleteComment(commentId: UUID, userId: String): CommentResponse {
-        logger.info { "Deleting comment $commentId by user $userId" }
+        val startTime = System.currentTimeMillis()
+        logger.info { "[COMMENT] Deleting comment - commentId: $commentId, userId: $userId" }
 
         val comment = commentRepository.findById(commentId).orElseThrow {
             throw CommentNotFoundException(commentId)
         }
 
+        logger.debug { "[COMMENT] Comment details - id: $commentId, owner: ${comment.userId}, targetType: ${comment.targetType}, targetId: ${comment.targetId}" }
+
         // Check authorization
         if (comment.userId != userId) {
+            logger.warn { "[COMMENT] Unauthorized delete attempt - commentId: $commentId, attemptedBy: $userId, owner: ${comment.userId}" }
             throw UnauthorizedOperationException("You are not authorized to delete this comment")
         }
 
@@ -154,10 +173,13 @@ class CommentService(
         comment.updatedAt = LocalDateTime.now()
 
         val deletedComment = commentRepository.save(comment)
-        logger.info { "Comment soft deleted: $commentId" }
+        logger.info { "[COMMENT] Comment soft deleted - commentId: $commentId, userId: ${deletedComment.userId}" }
 
         // Sync to Elasticsearch
         elasticsearchSyncService.syncComment(deletedComment)
+
+        val duration = System.currentTimeMillis() - startTime
+        logger.info { "[COMMENT] Comment deletion completed - commentId: $commentId, duration: ${duration}ms" }
 
         return toResponse(deletedComment, userId)
     }

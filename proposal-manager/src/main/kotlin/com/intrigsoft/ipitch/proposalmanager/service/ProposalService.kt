@@ -31,11 +31,13 @@ class ProposalService(
      * 1. Create a new proposal
      */
     fun createProposal(request: CreateProposalRequest): ProposalResponse {
-        logger.info { "Creating new proposal: ${request.title} for owner ${request.ownerId}" }
+        val startTime = System.currentTimeMillis()
+        logger.info { "[PROPOSAL-CHANGE] Creating new proposal - title: '${request.title}', owner: ${request.ownerId}, contentLength: ${request.content.length}" }
 
         try {
             // Get or create user for git attribution
             val owner = getOrCreateUser(request.ownerId)
+            logger.debug { "[PROPOSAL-CHANGE] Owner resolved - userId: ${owner.userId}, name: ${owner.getGitAuthorName()}, email: ${owner.getGitAuthorEmail()}" }
 
             // Create proposal in database
             val proposal = Proposal(
@@ -46,7 +48,7 @@ class ProposalService(
             )
 
             val savedProposal = proposalRepository.save(proposal)
-            logger.info { "Proposal created in database with ID: ${savedProposal.id}" }
+            logger.info { "[PROPOSAL-CHANGE] Proposal created in database - id: ${savedProposal.id}, status: DRAFT" }
 
             // Create proposal in Git with user's git credentials
             val workingBranch = gitService.createProposal(
@@ -62,11 +64,13 @@ class ProposalService(
             savedProposal.updatedAt = LocalDateTime.now()
             val finalProposal = proposalRepository.save(savedProposal)
 
-            logger.info { "Proposal ${finalProposal.id} created successfully with working branch: $workingBranch by ${owner.getGitAuthorName()}" }
+            val duration = System.currentTimeMillis() - startTime
+            logger.info { "[PROPOSAL-CHANGE] Proposal creation completed - id: ${finalProposal.id}, branch: $workingBranch, author: ${owner.getGitAuthorName()}, duration: ${duration}ms" }
 
             return toProposalResponse(finalProposal)
         } catch (e: Exception) {
-            logger.error(e) { "Error creating proposal: ${request.title}" }
+            val duration = System.currentTimeMillis() - startTime
+            logger.error(e) { "[PROPOSAL-CHANGE] Failed to create proposal - title: '${request.title}', owner: ${request.ownerId}, duration: ${duration}ms, error: ${e.message}" }
             throw e
         }
     }
@@ -75,25 +79,30 @@ class ProposalService(
      * 2. Update proposal metadata
      */
     fun updateProposalMetadata(proposalId: UUID, request: UpdateProposalMetadataRequest): ProposalResponse {
-        logger.info { "Updating metadata for proposal $proposalId" }
+        val startTime = System.currentTimeMillis()
+        logger.info { "[PROPOSAL-CHANGE] Updating metadata for proposal $proposalId" }
 
         val proposal = proposalRepository.findById(proposalId)
             .orElseThrow { ProposalNotFoundException("Proposal not found: $proposalId") }
 
+        val oldStatus = proposal.status
+        val oldStats = proposal.stats.toString()
+
         request.status?.let {
-            logger.debug { "Updating proposal status to $it" }
+            logger.info { "[PROPOSAL-CHANGE] Status change - proposalId: $proposalId, from: $oldStatus, to: $it" }
             proposal.status = it
         }
 
         request.stats?.let {
-            logger.debug { "Updating proposal stats" }
+            logger.info { "[PROPOSAL-CHANGE] Stats update - proposalId: $proposalId, oldStats: $oldStats, newStats: $it" }
             proposal.stats = it
         }
 
         proposal.updatedAt = LocalDateTime.now()
         val updatedProposal = proposalRepository.save(proposal)
 
-        logger.info { "Proposal $proposalId metadata updated successfully" }
+        val duration = System.currentTimeMillis() - startTime
+        logger.info { "[PROPOSAL-CHANGE] Metadata update completed - proposalId: $proposalId, duration: ${duration}ms" }
 
         return toProposalResponse(updatedProposal)
     }
@@ -165,10 +174,14 @@ class ProposalService(
      * 5. Update proposal content (Git commit on contributor branch)
      */
     fun updateContent(proposalId: UUID, request: UpdateContentRequest): ProposalResponse {
-        logger.info { "Updating content for proposal $proposalId by contributor ${request.contributorId}" }
+        val startTime = System.currentTimeMillis()
+        logger.info { "[PROPOSAL-CHANGE] Updating content - proposalId: $proposalId, contributorId: ${request.contributorId}, newContentLength: ${request.content.length}" }
 
         val proposal = proposalRepository.findById(proposalId)
             .orElseThrow { ProposalNotFoundException("Proposal not found: $proposalId") }
+
+        val oldContent = proposal.content
+        val oldContentLength = oldContent.length
 
         val contributor = contributorRepository.findById(request.contributorId)
             .orElseThrow { ContributorNotFoundException("Contributor not found: ${request.contributorId}") }
@@ -183,6 +196,7 @@ class ProposalService(
 
         // Get user info for Git commit
         val user = getOrCreateUser(contributor.userId)
+        logger.debug { "[PROPOSAL-CHANGE] Contributor details - userId: ${user.userId}, name: ${user.getGitAuthorName()}, email: ${user.getGitAuthorEmail()}" }
 
         // Commit to Git with user's git credentials
         val commitHash = gitService.updateContent(
@@ -194,13 +208,16 @@ class ProposalService(
             authorEmail = user.getGitAuthorEmail()
         )
 
-        logger.info { "Content updated in Git with commit: $commitHash by ${user.getGitAuthorName()}" }
+        logger.info { "[PROPOSAL-CHANGE] Git commit created - commitHash: $commitHash, author: ${user.getGitAuthorName()}, message: '${request.commitMessage}'" }
 
         // Update proposal metadata
         proposal.content = request.content
         proposal.gitCommitHash = commitHash
         proposal.updatedAt = LocalDateTime.now()
         val updatedProposal = proposalRepository.save(proposal)
+
+        val duration = System.currentTimeMillis() - startTime
+        logger.info { "[PROPOSAL-CHANGE] Content update completed - proposalId: $proposalId, oldLength: $oldContentLength, newLength: ${request.content.length}, commitHash: $commitHash, duration: ${duration}ms" }
 
         return toProposalResponse(updatedProposal)
     }
@@ -209,10 +226,14 @@ class ProposalService(
      * 6. Update proposal title (Git commit on contributor branch)
      */
     fun updateTitle(proposalId: UUID, request: UpdateTitleRequest): ProposalResponse {
-        logger.info { "Updating title for proposal $proposalId by contributor ${request.contributorId}" }
+        val startTime = System.currentTimeMillis()
+        logger.info { "[PROPOSAL-CHANGE] Updating title - proposalId: $proposalId, contributorId: ${request.contributorId}" }
 
         val proposal = proposalRepository.findById(proposalId)
             .orElseThrow { ProposalNotFoundException("Proposal not found: $proposalId") }
+
+        val oldTitle = proposal.title
+        logger.info { "[PROPOSAL-CHANGE] Title change - proposalId: $proposalId, oldTitle: '$oldTitle', newTitle: '${request.title}'" }
 
         val contributor = contributorRepository.findById(request.contributorId)
             .orElseThrow { ContributorNotFoundException("Contributor not found: ${request.contributorId}") }
@@ -227,6 +248,7 @@ class ProposalService(
 
         // Get user info for Git commit
         val user = getOrCreateUser(contributor.userId)
+        logger.debug { "[PROPOSAL-CHANGE] Contributor details - userId: ${user.userId}, name: ${user.getGitAuthorName()}" }
 
         // Commit to Git with user's git credentials
         val commitHash = gitService.updateTitle(
@@ -238,13 +260,16 @@ class ProposalService(
             authorEmail = user.getGitAuthorEmail()
         )
 
-        logger.info { "Title updated in Git with commit: $commitHash by ${user.getGitAuthorName()}" }
+        logger.info { "[PROPOSAL-CHANGE] Git commit created - commitHash: $commitHash, author: ${user.getGitAuthorName()}, message: '${request.commitMessage}'" }
 
         // Update proposal metadata
         proposal.title = request.title
         proposal.gitCommitHash = commitHash
         proposal.updatedAt = LocalDateTime.now()
         val updatedProposal = proposalRepository.save(proposal)
+
+        val duration = System.currentTimeMillis() - startTime
+        logger.info { "[PROPOSAL-CHANGE] Title update completed - proposalId: $proposalId, commitHash: $commitHash, duration: ${duration}ms" }
 
         return toProposalResponse(updatedProposal)
     }
@@ -323,10 +348,13 @@ class ProposalService(
      * 9. Publish proposal (merge to main and tag with version)
      */
     fun publishProposal(proposalId: UUID, ownerId: String): ProposalResponse {
-        logger.info { "Publishing proposal $proposalId" }
+        val startTime = System.currentTimeMillis()
+        logger.info { "[PROPOSAL-CHANGE] Publishing proposal - proposalId: $proposalId, ownerId: $ownerId" }
 
         val proposal = proposalRepository.findById(proposalId)
             .orElseThrow { ProposalNotFoundException("Proposal not found: $proposalId") }
+
+        logger.info { "[PROPOSAL-CHANGE] Proposal details before publish - id: $proposalId, title: '${proposal.title}', currentVersion: ${proposal.version}, status: ${proposal.status}, contributors: ${proposal.contributors.size}" }
 
         // Verify owner
         if (proposal.ownerId != ownerId) {
@@ -339,11 +367,11 @@ class ProposalService(
 
         // Increment version
         val newVersion = incrementVersion(proposal.version)
+        logger.info { "[PROPOSAL-CHANGE] Version increment - oldVersion: ${proposal.version}, newVersion: $newVersion" }
 
         // Publish in Git (merge to main and tag)
         val commitHash = gitService.publishProposal(proposalId, newVersion)
-
-        logger.info { "Proposal published with commit: $commitHash and version: $newVersion" }
+        logger.info { "[PROPOSAL-CHANGE] Git publish completed - commitHash: $commitHash, version tag: $newVersion" }
 
         // Update proposal
         proposal.version = newVersion
@@ -352,6 +380,8 @@ class ProposalService(
         proposal.updatedAt = LocalDateTime.now()
         val publishedProposal = proposalRepository.save(proposal)
 
+        logger.info { "[PROPOSAL-CHANGE] Proposal status changed - proposalId: $proposalId, from: DRAFT, to: PUBLISHED, version: $newVersion" }
+
         // Mark all contributors (including owner) as dirty for score recalculation
         markContributorsAsDirty(publishedProposal)
 
@@ -359,14 +389,14 @@ class ProposalService(
         try {
             proposalAnalysisService?.let {
                 runBlocking {
-                    logger.info { "Starting AI analysis for proposal $proposalId" }
+                    logger.info { "[PROPOSAL-CHANGE] Starting AI analysis for proposal $proposalId" }
                     val analysisResult = it.analyzeProposal(publishedProposal)
-                    logger.info { "AI analysis completed for proposal $proposalId. Summary: ${analysisResult.summary.take(100)}..." }
-                    logger.info { "Clarity score: ${analysisResult.clarityScore}, Sector scores: ${analysisResult.sectorScores}" }
+                    logger.info { "[PROPOSAL-CHANGE] AI analysis completed - proposalId: $proposalId, clarityScore: ${analysisResult.clarityScore}, summary length: ${analysisResult.summary.length}" }
+                    logger.debug { "[PROPOSAL-CHANGE] Sector scores: ${analysisResult.sectorScores}" }
                 }
-            } ?: logger.warn { "ProposalAnalysisService not available, skipping AI analysis" }
+            } ?: logger.warn { "[PROPOSAL-CHANGE] ProposalAnalysisService not available, skipping AI analysis for proposal $proposalId" }
         } catch (e: Exception) {
-            logger.error(e) { "Error during AI analysis for proposal $proposalId, but proposal was published successfully" }
+            logger.error(e) { "[PROPOSAL-CHANGE] AI analysis failed for proposal $proposalId, but proposal was published successfully - error: ${e.message}" }
             // Don't fail the publication if AI analysis fails
         }
 
@@ -396,11 +426,14 @@ class ProposalService(
                 updatedAt = publishedProposal.updatedAt
             )
             proposalViewManagerClient.publishProposal(publishDto)
-            logger.info { "Proposal $proposalId published to view manager" }
+            logger.info { "[PROPOSAL-CHANGE] Proposal indexed in view manager - proposalId: $proposalId" }
         } catch (e: Exception) {
-            logger.error(e) { "Error publishing proposal to view manager, but proposal was saved to database" }
+            logger.error(e) { "[PROPOSAL-CHANGE] Failed to index in view manager - proposalId: $proposalId, error: ${e.message}" }
             // Don't fail the operation if view manager is down
         }
+
+        val totalDuration = System.currentTimeMillis() - startTime
+        logger.info { "[PROPOSAL-CHANGE] Proposal published successfully - proposalId: $proposalId, version: $newVersion, totalDuration: ${totalDuration}ms" }
 
         return toProposalResponse(publishedProposal)
     }
@@ -409,10 +442,13 @@ class ProposalService(
      * 10. Revert proposal to previous version
      */
     fun revertProposal(proposalId: UUID, ownerId: String): ProposalResponse {
-        logger.info { "Reverting proposal $proposalId" }
+        val startTime = System.currentTimeMillis()
+        logger.info { "[PROPOSAL-CHANGE] Reverting proposal - proposalId: $proposalId, ownerId: $ownerId" }
 
         val proposal = proposalRepository.findById(proposalId)
             .orElseThrow { ProposalNotFoundException("Proposal not found: $proposalId") }
+
+        logger.info { "[PROPOSAL-CHANGE] Proposal state before revert - id: $proposalId, version: ${proposal.version}, status: ${proposal.status}" }
 
         // Verify owner
         if (proposal.ownerId != ownerId) {
@@ -427,12 +463,13 @@ class ProposalService(
         val revertResult = gitService.revertProposal(proposalId, proposal.version)
 
         if (!revertResult.success) {
+            logger.error { "[PROPOSAL-CHANGE] Git revert failed - proposalId: $proposalId, message: ${revertResult.message}" }
             throw InvalidOperationException(revertResult.message)
         }
 
         // If this is the first version, just mark as DRAFT
         if (revertResult.previousVersion == null || revertResult.proposalData == null) {
-            logger.info { "Proposal $proposalId is at initial version, marking as DRAFT" }
+            logger.info { "[PROPOSAL-CHANGE] Reverting to initial state - proposalId: $proposalId, marking as DRAFT" }
             proposal.status = ProposalStatus.DRAFT
             proposal.updatedAt = LocalDateTime.now()
             val updatedProposal = proposalRepository.save(proposal)
@@ -440,16 +477,20 @@ class ProposalService(
             // Remove from view manager index
             try {
                 proposalViewManagerClient.deleteProposal(proposalId.toString())
-                logger.info { "Removed proposal $proposalId from view manager index" }
+                logger.info { "[PROPOSAL-CHANGE] Removed from view manager - proposalId: $proposalId" }
             } catch (e: Exception) {
-                logger.error(e) { "Error removing proposal from view manager, but proposal was reverted in database" }
+                logger.error(e) { "[PROPOSAL-CHANGE] Failed to remove from view manager - proposalId: $proposalId, error: ${e.message}" }
             }
+
+            val duration = System.currentTimeMillis() - startTime
+            logger.info { "[PROPOSAL-CHANGE] Proposal reverted to DRAFT - proposalId: $proposalId, duration: ${duration}ms" }
 
             return toProposalResponse(updatedProposal)
         }
 
         // Update proposal with previous version data
         val previousData = revertResult.proposalData
+        val oldVersion = proposal.version
         proposal.title = previousData.title
         proposal.content = previousData.content
         proposal.version = previousData.version
@@ -458,7 +499,7 @@ class ProposalService(
         proposal.updatedAt = LocalDateTime.now()
         val revertedProposal = proposalRepository.save(proposal)
 
-        logger.info { "Proposal $proposalId reverted to version ${previousData.version}" }
+        logger.info { "[PROPOSAL-CHANGE] Proposal reverted - proposalId: $proposalId, fromVersion: $oldVersion, toVersion: ${previousData.version}" }
 
         // Publish previous version to view manager
         try {
@@ -486,10 +527,13 @@ class ProposalService(
                 updatedAt = revertedProposal.updatedAt
             )
             proposalViewManagerClient.publishProposal(publishDto)
-            logger.info { "Published reverted proposal $proposalId (version ${previousData.version}) to view manager" }
+            logger.info { "[PROPOSAL-CHANGE] Reverted proposal indexed in view manager - proposalId: $proposalId, version: ${previousData.version}" }
         } catch (e: Exception) {
-            logger.error(e) { "Error publishing reverted proposal to view manager, but proposal was reverted in database" }
+            logger.error(e) { "[PROPOSAL-CHANGE] Failed to index reverted proposal in view manager - proposalId: $proposalId, error: ${e.message}" }
         }
+
+        val totalDuration = System.currentTimeMillis() - startTime
+        logger.info { "[PROPOSAL-CHANGE] Proposal revert completed - proposalId: $proposalId, version: ${previousData.version}, duration: ${totalDuration}ms" }
 
         return toProposalResponse(revertedProposal)
     }
